@@ -210,9 +210,23 @@ improves every time someone corrects it is worth more than a marginally better m
 
 There is **no official YouTube Music API**. `ytmusicapi` works by replaying web-client
 requests with your cookies — fine for a personal script, but it is unofficial, breaks
-without warning, and is not a defensible base for a public product. The supported path is
-the **YouTube IFrame Player API**, which plays regular YouTube videos with an embedded
-player you must keep visible. Start with Spotify; add YouTube as the free-tier fallback.
+without warning, and is not a defensible base for a public product.
+
+The supported path is the **YouTube IFrame Player API**, which plays regular YouTube
+videos in an embedded player you must keep visible (≥200×200, per YouTube's terms).
+
+The detail that makes this work well: **a YouTube Music track and its YouTube video
+share the same 11-character video ID.** So `Share → Copy link` in the YouTube Music app
+produces a URL Jammer can play directly — no auth, no API key, no quota. Paste-a-link is
+the primary entry point, with Data API v3 search as a secondary path.
+
+YouTube is arguably the *better* transport for this app despite being the "free" one:
+`setPlaybackRate` gives 0.25×–2×, and practising a passage at 70% speed is the feature
+guitarists ask for first. Spotify's SDK cannot change rate at all.
+
+What's still out of reach: "Liked Music" (`LM`) is a YouTube Music auto-playlist that no
+official API exposes, and neither are YTM uploads. User-created YTM playlists *are*
+ordinary YouTube playlists, so OAuth + `playlists.list(mine=true)` reaches those.
 
 ---
 

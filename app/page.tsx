@@ -28,6 +28,21 @@ export default function Home() {
         Tab, chords and lyrics that follow the actual recording you&rsquo;re playing.
       </p>
 
+      <section className="home-card featured">
+        <h2>YouTube / YouTube Music</h2>
+        <p>
+          Paste a link from the YouTube Music app &mdash; <strong>Share &rarr; Copy
+          link</strong> &mdash; and start jamming. No sign-in, nothing to set up.
+        </p>
+        <p className="muted">
+          This is also the best transport for practice: YouTube lets Jammer slow the
+          track down and keep the chart locked to it. Spotify can&rsquo;t do that at all.
+        </p>
+        <Link href="/youtube" className="button">
+          Open YouTube
+        </Link>
+      </section>
+
       <section className="home-card">
         <h2>Start with a local file</h2>
         <p>

@@ -54,7 +54,12 @@ npm run dev
 
 Open http://localhost:3000.
 
-**Try the local-file mode first** (`/jam/local`) — drag in an MP3. No auth, no Spotify
+**On YouTube Music?** Go to `/youtube` and paste a link. In the YT Music app:
+Share → Copy link. A YouTube Music link and a YouTube link carry the same video ID, so
+this needs no sign-in, no API key and no quota. It's also the only transport that can
+**slow the track down** — Spotify's SDK has no playback-rate control at all.
+
+**Try the local-file mode** (`/jam/local`) — drag in an MP3. No auth, no Spotify
 Premium, no analyzer service. It exercises the clock, the renderer and the cursor, which
 is the part that has to feel right before anything else matters.
 
@@ -88,7 +93,8 @@ lib/clock.ts             ★ drift-corrected playback clock — the heart of it
 lib/sync-engine.ts       ★ alphaTab external-media bridge + the three loops
 lib/types.ts               JammerChart format, TickMap, sync points
 lib/transport.ts           the interface every playback source implements
-lib/transports/            spotify (Web Playback SDK) · local (<audio>)
+lib/transports/            spotify (Web Playback SDK) · youtube (IFrame) · local
+lib/youtube.ts             URL parsing, Data API search, title heuristics
 lib/spotify-auth.ts        PKCE, no client secret
 lib/spotify-api.ts         only the endpoints that still exist
 lib/lyrics.ts              LRCLIB client + LRC parser
@@ -97,6 +103,7 @@ lib/fretboard.ts           chord voicings, tick→ms for the highway
 lib/sync-points.ts         alignment maths + validation (pure, tested)
 lib/chart-store.ts         persistence, export/import
 hooks/useSpotifyPlayer.ts  SDK loading and its four failure modes
+hooks/useYouTubePlayer.ts  IFrame API loading, player lifecycle
 components/FretboardHighway.tsx ★ the scrolling Guitar-Hero fretboard (canvas)
 components/ChordPanel.tsx     now/next chord diagrams
 components/SyncEditor.tsx     nudge / two-point / tap alignment
@@ -110,6 +117,30 @@ analyzer/main.py           FastAPI, queued jobs
 app/dev/highway            visual harness for tuning the highway
 test/                      clock simulation, chart/lyrics, fretboard
 ```
+
+## YouTube / YouTube Music
+
+There is **no official YouTube Music API**. What works, and what doesn't:
+
+| | Status |
+|---|---|
+| Play any track | ✅ IFrame Player API — official, free, no Premium |
+| Slow down / speed up | ✅ 0.25×–2×. **Spotify cannot do this at all** |
+| Search | ✅ Data API v3. Needs a free key. ~100 searches/day on the free quota |
+| Your YTM playlists | ⚠️ Backed by YouTube playlists, so reachable via OAuth (not wired yet) |
+| Your "Liked Music" | ❌ A YTM-only auto-playlist. No official API exposes it |
+| YTM uploads | ❌ Not exposed |
+
+**Paste-a-link is the primary path**, not a fallback: it needs no auth and no quota,
+and it's more reliable than anything built on an API. `ytmusicapi` can reach the rest
+by replaying web-client requests with your cookies — fine for a personal script, but it
+breaks without warning. If you want your Liked Music here, copy it into a normal
+playlist, which the official API can see.
+
+Two things to expect: official music videos from major labels often **block embedding**
+(error 101/150) — look for the "Artist - Topic" upload, which is the YouTube Music
+audio track and is almost always embeddable. And the player stays visible, because
+YouTube's terms require it.
 
 ## The fretboard highway
 
@@ -144,7 +175,7 @@ what you *hear* rather than to what the peaks look like.
 ## Tests
 
 ```bash
-npm test                      # 31 tests: clock sim, TickMap, LRC, voicings, alignment
+npm test                      # 38 tests: clock sim, TickMap, LRC, voicings, alignment, YT links
 cd analyzer && python3 test_pipeline.py   # 37 checks: fretting, beats, chords
 ```
 
@@ -178,12 +209,13 @@ Built and verified (`npx next build` is clean; both suites pass):
 - [x] Chord diagrams — now/next, with voicings
 - [x] Sync-point editor (nudge / two-point / tap) with validation
 - [x] Persistence for charts and alignments, with JSON export/import
+- [x] YouTube transport — paste-a-link, search, slow-down practice
 
 Not done:
 
 - [ ] Drum tab from the drums stem
 - [ ] Loop a section / count-in / mute-a-stem
-- [ ] YouTube transport
+- [ ] YouTube OAuth for your own playlists
 - [ ] Server-side persistence — charts live in localStorage, which is one
       "clear site data" away from gone. Export regularly until this lands.
 - [ ] Note-level editing (you can fix the alignment, not yet fix a wrong fret)

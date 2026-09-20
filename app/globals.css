@@ -387,3 +387,49 @@ kbd {
   background: var(--panel-2); border: 1px solid var(--border);
   border-radius: 4px; padding: 0.05em 0.35em;
 }
+
+/* ---------------------------------------------------------------- youtube */
+
+.home-card.featured { border-color: var(--accent-dim); }
+
+.yt-paste { margin-bottom: 2rem; }
+.yt-paste h2, .library section h2 { font-size: 1.05rem; margin-bottom: 0.4rem; }
+.yt-paste-row { display: flex; gap: 0.5rem; margin: 0.75rem 0 0.4rem; }
+.yt-paste-row input { flex: 1; min-width: 0; }
+.library section { margin-bottom: 2rem; }
+.muted.small { font-size: 0.8rem; }
+.yt-note { border-top: 1px solid var(--border); padding-top: 1.25rem; }
+.yt-note p { font-size: 0.85rem; }
+.library code {
+  font-family: var(--mono); font-size: 0.85em;
+  background: var(--panel-2); padding: 0.1em 0.35em; border-radius: 4px;
+}
+
+/* The player must stay visible and at least 200x200 — YouTube's terms require it,
+   and for a guitar app seeing someone's hands is a feature, not a tax. */
+.yt-shell { flex: 1; display: grid; grid-template-columns: 22rem 1fr; min-height: 0; }
+@media (max-width: 1000px) {
+  .yt-shell { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+}
+
+.yt-player {
+  background: #000;
+  border-right: 1px solid var(--border);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 0.75rem;
+}
+.yt-frame { width: 100%; aspect-ratio: 16 / 9; min-height: 200px; }
+.yt-frame iframe { width: 100%; height: 100%; border: 0; border-radius: 8px; }
+.yt-loading { padding: 1rem; }
+
+.yt-main { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+
+/* At phone width the back link and the page title fight for one row and the link
+   wraps mid-phrase. Stack them instead. */
+.library header { flex-wrap: wrap; }
+.library header h1 { font-size: 1.5rem; margin: 0; }
+@media (max-width: 520px) {
+  .library header { gap: 0.5rem; }
+  .library header > a { flex: 1 0 100%; }
+  .library header h1 { flex: 1 0 100%; }
+}
