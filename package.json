@@ -1,0 +1,30 @@
+{
+  "name": "jammer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Jam along with your favourite songs — tab, chords and lyrics synced to the actual recording you're streaming.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "postinstall": "node scripts/copy-alphatab-assets.mjs"
+  },
+  "dependencies": {
+    "@coderline/alphatab": "^1.8.0",
+    "next": "^15.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

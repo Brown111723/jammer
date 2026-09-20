@@ -1,0 +1,16 @@
+node_modules/
+.next/
+out/
+.env.local
+.env*.local
+public/alphatab/
+*.tsbuildinfo
+next-env.d.ts
+
+# analyzer
+analyzer/.venv/
+analyzer/__pycache__/
+analyzer/**/__pycache__/
+analyzer/cache/
+analyzer/uploads/
+*.pyc

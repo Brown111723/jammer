@@ -1,0 +1,31 @@
+# Web service
+fastapi>=0.115
+uvicorn[standard]>=0.32
+python-multipart>=0.0.12
+
+# Core audio
+numpy>=1.26,<2.2          # madmom and numba are fussy above this
+librosa>=0.10.2
+soundfile>=0.12
+scipy>=1.11
+
+# Stem separation. Install the torch build that matches your CUDA first:
+#   https://pytorch.org/get-started/locally/
+torch>=2.2
+demucs>=4.0
+
+# Note transcription
+basic-pitch>=0.4
+
+# Beat + downbeat tracking.
+#
+# madmom is the best classical option but has NOT been updated for modern numpy and
+# needs a source build. If it fails, the pipeline falls back to librosa automatically
+# (beats only, no downbeats, lower confidence).
+#
+#   pip install cython
+#   pip install git+https://github.com/CPJKU/madmom
+#
+# Modern alternatives worth trying instead:
+#   beat-this      - transformer beat/downbeat tracker, strong results
+#   allin1         - All-In-One structure analyzer (beats, downbeats, sections)

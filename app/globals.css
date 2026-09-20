@@ -1,0 +1,389 @@
+/* Dark by default — this is a tool you use in a room with a guitar, often at night. */
+
+:root {
+  --bg: #0e0f12;
+  --panel: #16181d;
+  --panel-2: #1d2027;
+  --border: #2a2e37;
+  --text: #e7e9ee;
+  --muted: #8b92a1;
+  --accent: #ff5c38;
+  --accent-dim: #7a2e1c;
+  --warn: #ffb020;
+  --ok: #3ddc84;
+
+  --radius: 10px;
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.muted { color: var(--muted); }
+.warn { color: var(--warn); }
+
+button, .button {
+  font: inherit;
+  padding: 0.55rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+button:hover, .button:hover { background: #262a33; text-decoration: none; }
+button.active { border-color: var(--accent); color: var(--accent); }
+.button.secondary { background: transparent; }
+
+input[type="search"], input[type="text"], select {
+  font: inherit;
+  padding: 0.55rem 0.8rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+}
+
+/* ---------------------------------------------------------------- home */
+
+.home { max-width: 52rem; margin: 0 auto; padding: 4rem 1.5rem; }
+.home h1 { font-size: 3rem; margin: 0; letter-spacing: -0.03em; }
+.tagline { color: var(--muted); font-size: 1.15rem; margin-top: 0.25rem; }
+
+.home-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-top: 1.5rem;
+}
+.home-card h2 { margin-top: 0; font-size: 1.15rem; }
+.home-card .button + .button { margin-left: 0.5rem; }
+.home-footer { margin-top: 3rem; font-size: 0.85rem; }
+
+/* ---------------------------------------------------------------- library */
+
+.library { max-width: 60rem; margin: 0 auto; padding: 2rem 1.5rem; }
+.library header {
+  display: flex; align-items: center; gap: 1.5rem; margin-bottom: 1.5rem;
+}
+.library nav { display: flex; gap: 0.5rem; }
+.search { width: 100%; margin-bottom: 1.5rem; }
+
+.tracklist { list-style: none; margin: 0; padding: 0; }
+.tracklist li + li { border-top: 1px solid var(--border); }
+.tracklist a {
+  display: grid;
+  grid-template-columns: 48px 1fr auto auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 0.5rem;
+  color: var(--text);
+  border-radius: 6px;
+}
+.tracklist a:hover { background: var(--panel); text-decoration: none; }
+.tracklist img { border-radius: 4px; }
+.tracklist-name { font-weight: 500; }
+.tracklist-duration { font-variant-numeric: tabular-nums; font-size: 0.9rem; }
+
+/* ---------------------------------------------------------------- jam */
+
+.jam { display: flex; flex-direction: column; height: 100vh; }
+
+.jam-header {
+  display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.jam-header h1 { font-size: 1.05rem; margin: 0; }
+.jam-header label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--muted); }
+.file-inputs { display: flex; gap: 1.25rem; flex-wrap: wrap; }
+.jam-error { padding: 1rem 1.25rem; }
+
+.jam-body { flex: 1; display: grid; grid-template-columns: 1fr 22rem; min-height: 0; }
+@media (max-width: 900px) { .jam-body { grid-template-columns: 1fr; } }
+
+.jam-tab { overflow: auto; padding: 1rem; min-height: 0; }
+.jam-lyrics { border-left: 1px solid var(--border); background: var(--panel); min-height: 0; }
+
+.placeholder { max-width: 34rem; margin: 4rem auto; text-align: center; }
+.placeholder h2 { font-size: 1.15rem; }
+
+/* alphaTab renders onto a light background by default; give it one deliberately
+   rather than fighting its stylesheet. */
+.tabview-host { background: #faf9f7; border-radius: var(--radius); }
+.tabview-loading, .tabview-error { padding: 1rem; color: var(--muted); }
+.tabview-error { color: var(--warn); }
+
+/* ---------------------------------------------------------------- transport */
+
+.transport {
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  padding: 0.6rem 1.25rem 0.85rem;
+}
+.transport-meta {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem;
+}
+.transport-facts { display: flex; gap: 1.25rem; align-items: center; }
+
+.fact { display: flex; flex-direction: column; line-height: 1.15; }
+.fact-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.fact-value { font-variant-numeric: tabular-nums; font-weight: 600; }
+/* Low-confidence analyzer output should LOOK provisional, not authoritative. */
+.fact.uncertain .fact-value { color: var(--warn); opacity: 0.85; }
+
+.transport-lock {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--warn);
+  opacity: 0.15;
+  transition: opacity 300ms ease;
+}
+
+.transport-controls { display: flex; align-items: center; gap: 0.85rem; }
+.transport-time { font-variant-numeric: tabular-nums; font-size: 0.85rem; color: var(--muted); min-width: 6.5rem; }
+
+.transport-rate { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+.transport-rate.disabled { color: var(--muted); cursor: help; }
+.transport-rate input { width: 6rem; }
+
+.scrub { position: relative; flex: 1; height: 22px; cursor: pointer; touch-action: none; }
+.scrub-track {
+  position: absolute; top: 9px; left: 0; right: 0; height: 4px;
+  background: var(--panel-2); border-radius: 2px;
+}
+.scrub-fill {
+  position: absolute; top: 9px; left: 0; width: 0; height: 4px;
+  background: var(--accent); border-radius: 2px;
+  /* No CSS transition — the clock already smooths this, and a transition here
+     would fight it and add lag. */
+}
+.scrub-knob {
+  position: absolute; top: 5px; left: 0; width: 12px; height: 12px;
+  margin-left: -6px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 92, 56, 0.2);
+}
+
+/* ---------------------------------------------------------------- lyrics */
+
+.lyrics {
+  height: 100%; overflow-y: auto; padding: 2rem 1.25rem;
+  scroll-behavior: smooth;
+}
+.lyrics.empty { display: flex; align-items: center; justify-content: center; }
+.lyrics-line {
+  margin: 0 0 0.85rem; font-size: 1rem; line-height: 1.4;
+  color: var(--muted); opacity: 0.55;
+  transition: color 150ms ease, opacity 150ms ease, transform 150ms ease;
+}
+.lyrics-line.active {
+  color: var(--text); opacity: 1; font-weight: 600;
+  transform: translateX(3px);
+}
+.lyrics-notice, .lyrics-credit { font-size: 0.75rem; }
+.lyrics-credit { margin-top: 2rem; }
+
+/* ---------------------------------------------------------------- calibrator */
+
+.modal {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+}
+.calibrator {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2rem;
+  max-width: 32rem;
+  text-align: center;
+}
+.calibrator h2 { margin-top: 0; }
+.calibrator .big { font-size: 3rem; font-weight: 700; font-variant-numeric: tabular-nums; margin: 0.5rem 0; }
+.calibrator button + button { margin-left: 0.5rem; }
+.calibrator details { margin-top: 1.5rem; text-align: left; }
+.calibrator summary { cursor: pointer; color: var(--muted); font-size: 0.85rem; }
+.tap-target { width: 100%; padding: 2rem; font-size: 1.25rem; }
+
+.callback { max-width: 34rem; margin: 6rem auto; padding: 0 1.5rem; }
+.callback code { font-family: var(--mono); background: var(--panel-2); padding: 0.1em 0.35em; border-radius: 4px; }
+
+/* ---------------------------------------------------------------- workspace */
+
+.workspace { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+
+.workspace-toolbar {
+  display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap;
+  padding: 0.5rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  font-size: 0.85rem;
+}
+.workspace-toolbar label { display: flex; align-items: center; gap: 0.45rem; color: var(--muted); }
+.workspace-toolbar button { padding: 0.35rem 0.7rem; font-size: 0.85rem; }
+
+.viewswitch { display: flex; gap: 0.25rem; }
+.viewswitch button { border-radius: 6px; }
+
+.workspace-lookahead input { width: 5.5rem; }
+.workspace-lookahead span { font-variant-numeric: tabular-nums; min-width: 2.2rem; }
+
+.workspace-notice {
+  margin: 0; padding: 0.55rem 1.25rem;
+  background: rgba(255, 176, 32, 0.1);
+  border-bottom: 1px solid rgba(255, 176, 32, 0.25);
+  color: var(--warn);
+  font-size: 0.85rem;
+}
+.workspace-notice code {
+  font-family: var(--mono); background: rgba(0,0,0,0.3);
+  padding: 0.1em 0.35em; border-radius: 4px;
+}
+
+.workspace-body { flex: 1; display: grid; min-height: 0; gap: 0; }
+.workspace-body.view-split { grid-template-columns: 1fr 1fr auto; }
+.workspace-body.view-highway { grid-template-columns: 1fr auto; }
+.workspace-body.view-notation { grid-template-columns: 1fr auto; }
+@media (max-width: 1100px) {
+  .workspace-body.view-split { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+}
+
+.workspace-highway { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.workspace-notation { overflow: auto; padding: 1rem; min-height: 0; min-width: 0; }
+.workspace-lyrics {
+  width: 20rem; border-left: 1px solid var(--border);
+  background: var(--panel); min-height: 0;
+}
+@media (max-width: 1100px) { .workspace-lyrics { display: none; } }
+
+/* ---------------------------------------------------------------- highway */
+
+.highway { flex: 1; width: 100%; min-height: 0; display: block; }
+
+/* ---------------------------------------------------------------- chords */
+
+.chordpanel {
+  display: flex; align-items: center; gap: 1.25rem;
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+  /* Must not be squeezed by the highway above it: an SVG with no intrinsic size
+     collapses to nothing when its flex parent shrinks, and the diagrams vanish. */
+  flex: 0 0 auto;
+  min-height: 11rem;
+}
+.chordpanel.empty { justify-content: center; padding: 1.25rem; }
+.chordpanel-label {
+  font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--muted); display: block; margin-bottom: 0.3rem;
+}
+.chordpanel-now, .chordpanel-next { text-align: center; }
+
+.chordpanel-countdown {
+  flex: 1; height: 3px; background: var(--panel-2);
+  border-radius: 2px; overflow: hidden;
+}
+.chordpanel-countdown-fill {
+  height: 100%; width: 100%; background: var(--accent);
+  transform-origin: left center; transform: scaleX(0);
+}
+
+.chord-diagram { color: var(--text); }
+.chord-diagram.small { color: var(--muted); }
+.chord-diagram.placeholder { color: var(--muted); font-size: 1.5rem; opacity: 0.4; }
+.chord-name {
+  font-weight: 700; font-size: 1.35rem; margin-bottom: 0.25rem;
+  font-variant-numeric: tabular-nums;
+}
+.chord-diagram.small .chord-name { font-size: 1rem; }
+/* SVG needs explicit dimensions — viewBox alone gives it no intrinsic size, so a
+   flex or grid parent will collapse it. */
+.chord-grid { display: block; margin: 0 auto; width: 96px; height: 116px; }
+.chord-diagram.small .chord-grid { width: 64px; height: 78px; }
+.chord-unknown { font-size: 0.7rem; }
+
+/* ---------------------------------------------------------------- sync editor */
+
+.synceditor {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  width: min(34rem, 92vw);
+  max-height: 88vh; overflow-y: auto;
+}
+.synceditor header { display: flex; justify-content: space-between; align-items: center; }
+.synceditor h2 { margin: 0; font-size: 1.1rem; }
+.synceditor h3 { font-size: 0.85rem; margin-bottom: 0.5rem; }
+.synceditor-intro { font-size: 0.85rem; }
+
+.synceditor-position {
+  font-variant-numeric: tabular-nums; color: var(--muted);
+  font-size: 0.85rem; margin-bottom: 0.75rem;
+}
+.synceditor-position span { color: var(--text); font-weight: 600; }
+
+.synceditor-modes { display: flex; gap: 0.4rem; margin-bottom: 1rem; }
+.synceditor-panel {
+  background: var(--panel-2); border-radius: var(--radius);
+  padding: 1rem; margin-bottom: 1rem;
+}
+.synceditor-panel p { font-size: 0.85rem; margin-top: 0; }
+.synceditor-panel label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; }
+.synceditor-panel input[type="number"] { width: 4.5rem; }
+.synceditor-panel button { margin-top: 0.5rem; margin-right: 0.4rem; }
+.synceditor-panel button.primary { border-color: var(--accent); color: var(--accent); }
+
+.synceditor-nudge { display: flex; align-items: center; gap: 0.75rem; }
+.synceditor-nudge input { flex: 1; }
+.synceditor-value { font-variant-numeric: tabular-nums; min-width: 4.5rem; text-align: right; }
+.synceditor-fine { display: flex; gap: 0.3rem; margin-top: 0.5rem; }
+.synceditor-fine button { font-variant-numeric: tabular-nums; padding: 0.3rem 0.55rem; font-size: 0.8rem; }
+.synceditor-pending { color: var(--accent); }
+.synceditor-capture { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.tap-big { width: 100%; padding: 1.5rem; font-size: 1.1rem; font-weight: 600; }
+
+.synceditor-problems {
+  background: rgba(255, 176, 32, 0.1);
+  border: 1px solid rgba(255, 176, 32, 0.25);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.82rem;
+}
+.synceditor-problems p { margin: 0.25rem 0; }
+
+.synceditor-anchors ul { list-style: none; margin: 0; padding: 0; max-height: 14rem; overflow-y: auto; }
+.synceditor-anchors li {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.35rem 0; border-top: 1px solid var(--border);
+  font-size: 0.82rem;
+}
+.synceditor-anchors button { padding: 0.15rem 0.45rem; font-size: 0.75rem; }
+.anchor-bar { min-width: 4.5rem; font-weight: 600; }
+.anchor-time { font-variant-numeric: tabular-nums; color: var(--muted); min-width: 5rem; }
+.anchor-badge {
+  font-size: 0.65rem; padding: 0.1rem 0.35rem; border-radius: 4px;
+  background: var(--panel-2); color: var(--muted); margin-right: auto;
+}
+.anchor-badge.confirmed { color: var(--ok); }
+
+kbd {
+  font-family: var(--mono); font-size: 0.85em;
+  background: var(--panel-2); border: 1px solid var(--border);
+  border-radius: 4px; padding: 0.05em 0.35em;
+}
