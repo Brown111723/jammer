@@ -18,6 +18,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChordPanel } from "./ChordPanel";
+import { ChordSheetImport } from "./ChordSheetImport";
+import { ChordSources } from "./ChordSources";
 import { LoopControls } from "./LoopControls";
 import { TransposePanel } from "./TransposePanel";
 import { FretboardHighway } from "./FretboardHighway";
@@ -53,6 +55,10 @@ export interface JamWorkspaceProps {
   audioSemitones?: number;
   onAudioShift?: (semitones: number) => void;
   shiftProgress?: number | null;
+  /** Song metadata, for chord-site links and for a chart built from a pasted sheet. */
+  songTitle?: string;
+  songArtist?: string;
+  onChartImported?: (chart: JammerChart) => void;
 }
 
 export function JamWorkspace({
@@ -67,6 +73,9 @@ export function JamWorkspace({
   audioSemitones = 0,
   onAudioShift,
   shiftProgress = null,
+  songTitle,
+  songArtist,
+  onChartImported,
 }: JamWorkspaceProps) {
   const [view, setView] = useState<JamView>("split");
   const [trackId, setTrackId] = useState<string | null>(null);
@@ -77,6 +86,7 @@ export function JamWorkspace({
   const [fretboard, setFretboard] = useState<FretboardConfig>(DEFAULT_FRETBOARD);
   const [showTranspose, setShowTranspose] = useState(false);
   const [countIn, setCountIn] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   // Adopt the chart's sync points when the chart changes.
   useEffect(() => {
@@ -247,6 +257,14 @@ export function JamWorkspace({
         />
       )}
 
+      {songTitle && (adjusted?.chords.length ?? 0) === 0 && (
+        <ChordSources
+          title={songTitle}
+          artist={songArtist ?? ""}
+          onPaste={onChartImported ? () => setImporting(true) : undefined}
+        />
+      )}
+
       {activeTrack?.source === "analyzer" && (
         <p className="workspace-notice">
           This part was machine-transcribed. Expect mistakes, especially on strummed
@@ -307,6 +325,22 @@ export function JamWorkspace({
           </aside>
         )}
       </div>
+
+      {importing && songTitle && onChartImported && (
+        <div className="modal">
+          <ChordSheetImport
+            engine={engine}
+            recording={recording}
+            title={songTitle}
+            artist={songArtist ?? ""}
+            onImported={(chart) => {
+              onChartImported(chart);
+              setImporting(false);
+            }}
+            onClose={() => setImporting(false)}
+          />
+        </div>
+      )}
 
       {syncOpen && (
         <div className="modal">

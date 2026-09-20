@@ -17,11 +17,14 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { YouTubeLibrary } from "../../components/YouTubeLibrary";
 import {
+  classifyLink,
+  getPlaylist,
+  getPlaylistTracks,
   parseStartSeconds,
-  parseVideoId,
   searchAvailable,
   searchVideos,
   YouTubeQuotaError,
+  type PlaylistInfo,
   type YouTubeVideo,
 } from "../../lib/youtube";
 
@@ -42,6 +45,9 @@ export default function YouTubePage() {
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [recent, setRecent] = useState<RecentEntry[]>([]);
+  const [album, setAlbum] = useState<PlaylistInfo | null>(null);
+  const [albumTracks, setAlbumTracks] = useState<YouTubeVideo[]>([]);
+  const [albumLoading, setAlbumLoading] = useState(false);
 
   const hasKey = searchAvailable();
 
@@ -69,17 +75,60 @@ export default function YouTubePage() {
     [recent, router],
   );
 
-  const submitPaste = useCallback(() => {
+  const submitPaste = useCallback(async () => {
     setPasteError(null);
-    const id = parseVideoId(paste);
-    if (!id) {
+    setAlbum(null);
+    setAlbumTracks([]);
+
+    const link = classifyLink(paste);
+    if (!link) {
       setPasteError(
-        "That doesn't look like a YouTube link or video ID. A YouTube Music link " +
-          "(music.youtube.com/watch?v=…) works too.",
+        "That doesn't look like a YouTube link. A song link, an album link or a " +
+          "playlist link from YouTube Music all work.",
       );
       return;
     }
-    open(id, paste, parseStartSeconds(paste));
+
+    // A song link goes straight to the jam page.
+    if (link.kind === "video") {
+      open(link.id, paste, parseStartSeconds(paste));
+      return;
+    }
+
+    // An album or playlist expands into a track list to pick from. YouTube Music
+    // album pages are playlists underneath (list=OLAK5uy_...).
+    if (!searchAvailable()) {
+      setPasteError(
+        "That's an album or playlist. Expanding one needs a YouTube API key in " +
+          "NEXT_PUBLIC_YOUTUBE_API_KEY — see .env.example. Individual song links " +
+          "work without it.",
+      );
+      return;
+    }
+
+    setAlbumLoading(true);
+    try {
+      const [info, tracks] = await Promise.all([
+        getPlaylist(link.id),
+        getPlaylistTracks(link.id),
+      ]);
+      if (!info && tracks.length === 0) {
+        setPasteError("That playlist is empty, private, or doesn't exist.");
+        return;
+      }
+      setAlbum(info);
+      setAlbumTracks(tracks);
+    } catch (err) {
+      setPasteError(
+        err instanceof YouTubeQuotaError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : String(err),
+      );
+    } finally {
+      setAlbumLoading(false);
+    }
   }, [paste, open]);
 
   const runSearch = useCallback(async () => {
@@ -115,9 +164,10 @@ export default function YouTubePage() {
       <section className="yt-paste">
         <h2>Paste a link</h2>
         <p className="muted">
-          In the YouTube Music app: <strong>Share → Copy link</strong>. Paste it here.
-          No sign-in, no API key, nothing to set up &mdash; a YouTube Music link and a
-          YouTube link carry the same video ID.
+          In the YouTube Music app: <strong>Share &rarr; Copy link</strong>. Paste it
+          here. A <strong>song</strong>, an <strong>album</strong> or a{" "}
+          <strong>playlist</strong> all work &mdash; albums expand into a track list.
+          Songs need no sign-in or API key at all.
         </p>
         <div className="yt-paste-row">
           <input
@@ -126,15 +176,45 @@ export default function YouTubePage() {
             placeholder="music.youtube.com/watch?v=…"
             value={paste}
             onChange={(e) => setPaste(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && submitPaste()}
+            onKeyDown={(e) => e.key === "Enter" && void submitPaste()}
             autoFocus
           />
-          <button className="button" onClick={submitPaste}>
+          <button className="button" onClick={() => void submitPaste()}>
             Jam
           </button>
         </div>
         {pasteError && <p className="warn">{pasteError}</p>}
+        {albumLoading && <p className="muted">Loading album&hellip;</p>}
       </section>
+
+      {albumTracks.length > 0 && (
+        <section>
+          <h2>
+            {album?.title ?? "Album"}{" "}
+            <span className="muted">
+              {album?.channel ? `· ${album.channel} ` : ""}· {albumTracks.length} tracks
+            </span>
+          </h2>
+          <ul className="tracklist">
+            {albumTracks.map((v, i) => (
+              <li key={`${v.id}-${i}`}>
+                <a
+                  href={`/jam/youtube/${v.id}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    open(v.id, v.title);
+                  }}
+                >
+                  <span className="track-number muted">{i + 1}</span>
+                  <span className="tracklist-name">{v.title}</span>
+                  <span className="tracklist-artist muted">{v.channel}</span>
+                  <span />
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <YouTubeLibrary onPick={(v) => open(v.id, v.title)} />
 

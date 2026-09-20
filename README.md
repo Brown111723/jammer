@@ -96,6 +96,8 @@ lib/transport.ts           the interface every playback source implements
 lib/transports/            spotify (Web Playback SDK) · youtube (IFrame) · local
 lib/youtube.ts             URL parsing, Data API search, title heuristics
 lib/youtube-library.ts     signed-in playlists and liked music
+lib/chord-sheet.ts         chord-sheet parser (chords-above + ChordPro)
+lib/chord-chart.ts         timed chords -> a synced JammerChart
 lib/google-auth.ts         Google PKCE (token exchange is server-side — see below)
 lib/loop.ts                loop regions, bar snapping
 lib/transpose.ts           tuning/capo re-fretting, chord transposition
@@ -121,6 +123,7 @@ analyzer/pipeline.py       Demucs → beats → key → chords → pitch → fre
 analyzer/main.py           FastAPI, queued jobs
 app/api/youtube/token      server-side OAuth exchange (Google requires a secret)
 app/dev/highway            visual harness for tuning the highway
+app/dev/import             visual harness for the chord-sheet importer
 test/                      clock simulation, chart/lyrics, fretboard
 ```
 
@@ -178,6 +181,37 @@ reporting the right pitch — the partials in adjacent bins drift apart and canc
 tested against synthetic tones: +12 semitones must double the frequency and leave the
 duration alone.
 
+## Getting chords for a song
+
+There is **no legitimate API for chords or tabs.** Ultimate Guitar has none (only
+scrapers). Chordify has none — there's a support-forum post asking for one. Hooktheory
+returns aggregate statistics, not per-song lookups. Every chord site either analyses
+audio itself or is human-transcribed behind a login.
+
+So Jammer does the two halves it legitimately can:
+
+1. **Find chords** — the jam page links straight to pre-searched results for whatever
+   is playing, on Ultimate Guitar, Songsterr, e-chords and Chordie. One tap, right song.
+2. **Sync them** — copy the sheet, paste it into Jammer, tap once through the song on
+   each chord change. Now it's on the highway, saved, and auto-matched to every other
+   version of that song forever.
+
+Jammer never fetches from those sites itself. Their catalogues are licensed from
+publishers and their terms forbid automated access; a scraper is a liability for
+whoever hosts it and breaks every few weeks besides. You copying a page you're already
+reading is a different act entirely.
+
+The parser handles both the chords-above-lyrics layout the web uses and ChordPro
+brackets, picks up capo/key/tuning headers, and skips bar lines and repeat marks. Its
+heuristics deliberately fail toward *lyrics*: a missed chord is obvious, while a lyric
+line silently eaten as chords corrupts the sheet.
+
+**Why tapping rather than guessing the timing:** a chord sheet has no timing at all.
+Estimating a tempo and assuming a bar per chord is wrong constantly — intros, half-bar
+changes, a chord held under a solo — and a chart that's subtly wrong is worse than
+none, because you blame your own playing. One pass, once per song, and you were
+listening anyway.
+
 ## The fretboard highway
 
 A scrolling 3D fretboard: notes approach a hit line, one lane per string, the fret
@@ -211,8 +245,8 @@ what you *hear* rather than to what the peaks look like.
 ## Tests
 
 ```bash
-npm test                      # 49 tests: clock, TickMap, LRC, voicings, alignment,
-                              #           YT links, FFT + phase vocoder
+npm test                      # 68 tests: clock, TickMap, LRC, voicings, alignment,
+                              #           YT links, FFT + phase vocoder, chord sheets
 cd analyzer && python3 test_pipeline.py   # 37 checks: fretting, beats, chords
 ```
 
@@ -242,6 +276,9 @@ Built and verified (`npx next build` is clean; both suites pass):
 - [x] Latency calibrator
 - [x] LRCLIB lyrics with a parser that survives real-world LRC
 - [x] Analyzer pipeline and service (beats, key, chords, notes, fretting)
+- [x] Chord-sheet paste + parser, with tap-to-time and auto-generated strums
+- [x] Pre-searched links to the chord and tab sites
+- [x] Album and playlist links expand into a track list
 - [x] Fretboard highway, verified by screenshot
 - [x] Chord diagrams — now/next, with voicings
 - [x] Sync-point editor (nudge / two-point / tap) with validation

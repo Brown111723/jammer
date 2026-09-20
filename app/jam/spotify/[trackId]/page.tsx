@@ -204,6 +204,9 @@ export default function SpotifyJamPage({
         score={score}
         scoreTrackIndex={scoreTrackIndex}
         onScoreTracksLoaded={setScoreTracks}
+        songTitle={track?.name}
+        songArtist={track ? artistNames(track) : undefined}
+        onChartImported={setChart}
       />
     </main>
   );

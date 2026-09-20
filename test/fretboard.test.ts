@@ -227,3 +227,54 @@ test("nudging shifts every anchor and leaves ticks alone", () => {
   assert.deepEqual(moved.map((p) => p.mediaMs), [750, 2750]);
   assert.deepEqual(moved.map((p) => p.tick), [0, 4 * PPQ], "musical time is untouched");
 });
+
+test("common extended chords from real sheets have shapes", () => {
+  // A7sus4 is in Wonderwall; showing "no shape" for it was a real gap.
+  for (const symbol of ["A7sus4", "E7sus4", "Dsus4", "Em7", "Cadd9", "C6", "Am6", "E9"]) {
+    const v = voicingFor(symbol);
+    assert.ok(v, `${symbol} should have a shape`);
+    assert.ok(
+      v.frets.some((f) => f >= 0),
+      `${symbol} must have playable strings`,
+    );
+  }
+});
+
+test("unusual qualities fall back to a playable simplification", () => {
+  // A9 has a shape; A13 does not, so it should simplify to A7 rather than vanish.
+  const thirteenth = voicingFor("A13");
+  assert.ok(thirteenth, "A13 should fall back rather than return null");
+  assert.equal(
+    thirteenth.simplifiedFrom,
+    "A13",
+    "a substituted shape must say it was simplified",
+  );
+
+  const minorEleventh = voicingFor("Dm11");
+  assert.ok(minorEleventh, "Dm11 should fall back");
+  assert.ok(minorEleventh.simplifiedFrom);
+
+  // An exact match must NOT be flagged as simplified.
+  const plain = voicingFor("Am");
+  assert.ok(plain);
+  assert.equal(plain.simplifiedFrom, undefined);
+});
+
+test("a simplified voicing still contains the chord root", () => {
+  for (const symbol of ["A13", "Dm11", "Gmaj13", "C7b9"]) {
+    const v = voicingFor(symbol);
+    assert.ok(v, `${symbol} should resolve`);
+    const parsed = parseChordSymbol(symbol);
+    assert.ok(parsed);
+
+    const pitchClasses = new Set(
+      v.frets
+        .map((fret, s) => (fret < 0 ? null : (STANDARD_GUITAR[s] + fret) % 12))
+        .filter((pc): pc is number => pc !== null),
+    );
+    assert.ok(
+      pitchClasses.has(parsed.root),
+      `${symbol}: simplified shape must keep the root`,
+    );
+  }
+});

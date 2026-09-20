@@ -78,6 +78,26 @@ export function parseVideoId(input: string): string | null {
   return null;
 }
 
+/**
+ * What kind of link did the user paste?
+ *
+ * YouTube Music album links are playlist links under the skin — an album page is
+ * `music.youtube.com/playlist?list=OLAK5uy_...`. A track opened from an album carries
+ * BOTH a `v=` and a `list=`, and in that case the song is what they meant.
+ */
+export function classifyLink(
+  input: string,
+): { kind: "video"; id: string } | { kind: "playlist"; id: string } | null {
+  const video = parseVideoId(input);
+  if (video) return { kind: "video", id: video };
+
+  const list = parsePlaylistId(input);
+  // `LM` is the Liked Music auto-playlist, which the Data API cannot read.
+  if (list && list !== "LM") return { kind: "playlist", id: list };
+
+  return null;
+}
+
 /** Playlist ID from a URL, if there is one. `LM` (Liked Music) is not usable. */
 export function parsePlaylistId(input: string): string | null {
   try {
@@ -274,6 +294,96 @@ export async function getVideos(ids: string[]): Promise<YouTubeVideo[]> {
     thumbnail: item.snippet.thumbnails?.medium?.url,
     durationSec: parseIsoDuration(item.contentDetails.duration),
   }));
+}
+
+export interface PlaylistInfo {
+  id: string;
+  title: string;
+  channel: string;
+  itemCount: number;
+  thumbnail?: string;
+}
+
+/**
+ * Album/playlist details and its tracks, using only an API key — no sign-in.
+ *
+ * This is the public `playlists.list` / `playlistItems.list` pair, which works on any
+ * public playlist or album without OAuth. Both cost 1 quota unit, so expanding an
+ * album is essentially free next to a search at 100.
+ */
+export async function getPlaylist(playlistId: string): Promise<PlaylistInfo | null> {
+  const data = await dataApi<{
+    items: {
+      id: string;
+      snippet: { title: string; channelTitle: string; thumbnails?: { medium?: { url: string } } };
+      contentDetails: { itemCount: number };
+    }[];
+  }>("playlists", { part: "snippet,contentDetails", id: playlistId });
+
+  const item = data.items[0];
+  if (!item) return null;
+
+  return {
+    id: item.id,
+    title: decodeEntities(item.snippet.title),
+    channel: decodeEntities(item.snippet.channelTitle),
+    itemCount: item.contentDetails.itemCount,
+    thumbnail: item.snippet.thumbnails?.medium?.url,
+  };
+}
+
+export async function getPlaylistTracks(
+  playlistId: string,
+  max = 200,
+): Promise<YouTubeVideo[]> {
+  const out: YouTubeVideo[] = [];
+  let pageToken: string | undefined;
+
+  do {
+    const data = await dataApi<{
+      items: {
+        snippet: {
+          title: string;
+          videoOwnerChannelTitle?: string;
+          channelTitle?: string;
+          resourceId?: { videoId?: string };
+          thumbnails?: { medium?: { url: string } };
+        };
+      }[];
+      nextPageToken?: string;
+    }>("playlistItems", {
+      part: "snippet",
+      playlistId,
+      maxResults: "50",
+      ...(pageToken ? { pageToken } : {}),
+    });
+
+    for (const item of data.items) {
+      const id = item.snippet.resourceId?.videoId;
+      if (!id) continue;
+      // Tombstones for removed videos stay in the list and only produce dead links.
+      if (
+        item.snippet.title === "Deleted video" ||
+        item.snippet.title === "Private video"
+      ) {
+        continue;
+      }
+      out.push({
+        id,
+        title: decodeEntities(item.snippet.title),
+        channel: decodeEntities(
+          (item.snippet.videoOwnerChannelTitle ?? item.snippet.channelTitle ?? "").replace(
+            /\s*-\s*Topic$/i,
+            "",
+          ),
+        ),
+        thumbnail: item.snippet.thumbnails?.medium?.url,
+      });
+    }
+    pageToken = data.nextPageToken;
+  } while (pageToken && out.length < max);
+
+  return out;
 }
 
 /** ISO 8601 duration ("PT4M13S") to seconds. */

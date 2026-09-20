@@ -478,3 +478,84 @@ kbd {
 .yt-lib-head { display: flex; align-items: center; justify-content: space-between; }
 .yt-lib-tabs { display: flex; gap: 0.4rem; margin: 0.5rem 0 1rem; }
 .button.small, button.small { padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+
+/* ---------------------------------------------------------------- chord sources */
+
+.chordsources {
+  display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap;
+  padding: 0.6rem 1.25rem;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+.chordsources-label { color: var(--muted); }
+.chordsources-links { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.chordsources-links a {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+}
+.chordsources-links a:hover { border-color: var(--accent); text-decoration: none; }
+.chordsources-paste {
+  margin-left: auto; padding: 0.3rem 0.7rem; font-size: 0.82rem;
+  border-color: var(--accent-dim); color: var(--accent);
+}
+
+/* ---------------------------------------------------------------- sheet import */
+
+.sheet-import {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  width: min(42rem, 94vw);
+  max-height: 90vh; overflow-y: auto;
+}
+.sheet-import header { display: flex; justify-content: space-between; align-items: center; }
+.sheet-import h2 { margin: 0 0 0.25rem; font-size: 1.15rem; }
+.sheet-import p { font-size: 0.88rem; }
+
+.sheet-input {
+  width: 100%; margin: 0.75rem 0;
+  font-family: var(--mono); font-size: 0.82rem; line-height: 1.45;
+  padding: 0.75rem; border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg); color: var(--text);
+  resize: vertical; white-space: pre; overflow-x: auto;
+}
+
+.sheet-preview {
+  background: var(--panel-2); border-radius: var(--radius);
+  padding: 0.85rem 1rem; margin-bottom: 1rem;
+}
+.sheet-shapes { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.75rem 0; }
+.sheet-option {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 0.82rem; color: var(--muted); margin-top: 0.4rem;
+}
+.sheet-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
+.sheet-actions .primary { border-color: var(--accent); color: var(--accent); }
+
+.sheet-progress {
+  height: 4px; background: var(--panel-2); border-radius: 2px;
+  overflow: hidden; margin: 0.75rem 0 1.25rem;
+}
+.sheet-progress div { height: 100%; background: var(--accent); transition: width 120ms ease; }
+
+.sheet-now {
+  display: flex; align-items: center; justify-content: center;
+  gap: 2.5rem; min-height: 11rem;
+}
+.sheet-current { text-align: center; }
+.sheet-next { text-align: center; opacity: 0.75; }
+.sheet-section {
+  display: block; font-size: 0.68rem; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--accent); margin-bottom: 0.3rem;
+}
+.sheet-lyric { color: var(--muted); font-style: italic; margin: 0.4rem 0 0; font-size: 0.85rem; }
+.sheet-complete { text-align: center; }
+.sheet-complete .big { font-size: 1.5rem; font-weight: 700; color: var(--ok); }
+.sheet-status { text-align: center; font-variant-numeric: tabular-nums; margin: 0.5rem 0 0; }
+
+.track-number { min-width: 1.5rem; text-align: right; font-variant-numeric: tabular-nums; }

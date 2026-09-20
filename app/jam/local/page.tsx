@@ -320,6 +320,9 @@ export default function LocalJamPage() {
           score={score}
           scoreTrackIndex={scoreTrackIndex}
           onScoreTracksLoaded={setScoreTracks}
+          songTitle={chart?.title ?? file?.name}
+          songArtist={chart?.artist}
+          onChartImported={setChart}
           canShiftAudio
           audioSemitones={audioSemitones}
           onAudioShift={(n) => void shiftAudio(n)}

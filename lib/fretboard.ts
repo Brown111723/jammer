@@ -59,6 +59,11 @@ export interface Voicing {
   /** Which strings the barre covers, if any. */
   barre?: { fret: number; fromString: number; toString: number };
   name: string;
+  /**
+   * Set when we substituted a simpler quality — e.g. showing A7 for A9. The chord
+   * still fits the song; it just lacks the extension the sheet asked for.
+   */
+  simplifiedFrom?: string;
 }
 
 // ---------------------------------------------------------------- open shapes
@@ -95,6 +100,23 @@ const OPEN_SHAPES: Record<string, number[]> = {
   Asus2: [-1, 0, 2, 2, 0, 0],
   B7: [-1, 2, 1, 2, 0, 2],
   Bm: [-1, 2, 4, 4, 3, 2],
+  // 7sus4 — everywhere in Britpop and 70s rock (Wonderwall, Free Fallin').
+  A7sus4: [-1, 0, 2, 0, 3, 0],
+  E7sus4: [0, 2, 0, 2, 0, 0],
+  D7sus4: [-1, -1, 0, 2, 1, 3],
+  G7sus4: [3, 3, 0, 0, 1, 1],
+  C6: [-1, 3, 2, 2, 1, 0],
+  A6: [-1, 0, 2, 2, 2, 2],
+  E6: [0, 2, 2, 1, 2, 0],
+  G6: [3, 2, 0, 0, 0, 0],
+  D6: [-1, -1, 0, 2, 0, 2],
+  Em6: [0, 2, 2, 0, 2, 0],
+  Am6: [-1, 0, 2, 2, 1, 2],
+  Cadd9: [-1, 3, 2, 0, 3, 0],
+  Gadd9: [3, 2, 0, 2, 0, 3],
+  Dadd9: [-1, -1, 0, 2, 3, 0],
+  E9: [0, 2, 0, 1, 0, 2],
+  A9: [-1, 0, 2, 4, 2, 3],
   // Power chords — the backbone of rock, and almost always missing from chord charts.
   E5: [0, 2, 2, -1, -1, -1],
   A5: [-1, 0, 2, 2, -1, -1],
@@ -124,6 +146,11 @@ const MOVABLE: MovableShape[] = [
   { quality: "maj7", offsets: [0, 2, 1, 1, 0, 0], rootString: 0 },
   { quality: "sus4", offsets: [0, 2, 2, 2, 0, 0], rootString: 0 },
   { quality: "5", offsets: [0, 2, 2, -1, -1, -1], rootString: 0 },
+  { quality: "7sus4", offsets: [0, 2, 0, 2, 0, 0], rootString: 0 },
+  { quality: "6", offsets: [0, 2, 2, 1, 2, 0], rootString: 0 },
+  { quality: "m6", offsets: [0, 2, 2, 0, 2, 0], rootString: 0 },
+  { quality: "9", offsets: [0, 2, 0, 1, 0, 2], rootString: 0 },
+  { quality: "sus2", offsets: [0, 2, 4, 4, -1, -1], rootString: 0 },
   // A-shape (root on A)
   { quality: "", offsets: [-1, 0, 2, 2, 2, 0], rootString: 1 },
   { quality: "m", offsets: [-1, 0, 2, 2, 1, 0], rootString: 1 },
@@ -132,7 +159,46 @@ const MOVABLE: MovableShape[] = [
   { quality: "maj7", offsets: [-1, 0, 2, 1, 2, 0], rootString: 1 },
   { quality: "sus4", offsets: [-1, 0, 2, 2, 3, 0], rootString: 1 },
   { quality: "5", offsets: [-1, 0, 2, 2, -1, -1], rootString: 1 },
+  { quality: "7sus4", offsets: [-1, 0, 2, 0, 3, 0], rootString: 1 },
+  { quality: "6", offsets: [-1, 0, 2, 2, 2, 2], rootString: 1 },
+  { quality: "m6", offsets: [-1, 0, 2, 2, 1, 2], rootString: 1 },
+  { quality: "9", offsets: [-1, 0, 2, 1, 2, 0], rootString: 1 },
+  { quality: "sus2", offsets: [-1, 0, 2, 4, 4, -1], rootString: 1 },
 ];
+
+/**
+ * When we have no shape for a chord's exact quality, fall back to a simpler one that
+ * still sounds right against the recording.
+ *
+ * A9 played as A7 is a small loss; A9 shown as "no shape" is a total one. Extensions
+ * are colour, and the triad underneath is what keeps you in the song. The UI marks
+ * these as simplified so you know the sheet said something richer.
+ */
+const QUALITY_FALLBACKS: Record<string, string[]> = {
+  "7sus4": ["sus4", "7", ""],
+  "9": ["7", ""],
+  "11": ["7sus4", "sus4", "7", ""],
+  "13": ["7", ""],
+  maj9: ["maj7", ""],
+  maj11: ["maj7", ""],
+  maj13: ["maj7", ""],
+  m9: ["m7", "m"],
+  m11: ["m7", "m"],
+  m13: ["m7", "m"],
+  m6: ["m"],
+  "6": [""],
+  "69": ["6", ""],
+  add9: [""],
+  add11: [""],
+  sus: ["sus4"],
+  "7b9": ["7"],
+  "7#9": ["7"],
+  "7b5": ["7"],
+  "7#5": ["7", "aug"],
+  m7b5: ["dim", "m"],
+  dim7: ["dim"],
+  "": [],
+};
 
 const OPEN_STRING_PC = [4, 9, 2, 7, 11, 4]; // E A D G B E as pitch classes
 
@@ -153,6 +219,36 @@ export function voicingFor(symbol: string): Voicing | null {
   if (!parsed) return null;
 
   const { root, quality } = parsed;
+
+  // Exact quality first, then progressively simpler substitutes.
+  for (const [candidateQuality, isFallback] of qualityChain(quality)) {
+    const voicing = buildVoicing(root, candidateQuality, symbol);
+    if (voicing) {
+      return isFallback
+        ? { ...voicing, simplifiedFrom: symbol }
+        : voicing;
+    }
+  }
+
+  return null;
+}
+
+function* qualityChain(quality: string): Generator<[string, boolean]> {
+  yield [quality, false];
+  for (const fallback of QUALITY_FALLBACKS[quality] ?? []) {
+    yield [fallback, true];
+  }
+}
+
+function buildVoicing(
+  root: number,
+  quality: string,
+  displayName: string,
+): Voicing | null {
+  // An open shape for the substituted quality, if there is one.
+  const openName = `${PITCH_NAMES[root]}${quality}`;
+  const open = OPEN_SHAPES[openName];
+  if (open) return { frets: open, baseFret: 0, name: displayName };
 
   // Try both barre shapes, take whichever sits lower on the neck.
   const candidates: Voicing[] = [];
@@ -176,7 +272,7 @@ export function voicingFor(symbol: string): Voicing | null {
         fromString: shape.rootString,
         toString: 5,
       },
-      name: symbol,
+      name: displayName,
     });
   }
 
