@@ -433,3 +433,48 @@ kbd {
   .library header > a { flex: 1 0 100%; }
   .library header h1 { flex: 1 0 100%; }
 }
+
+/* ---------------------------------------------------------------- loop */
+
+.loop { display: flex; align-items: center; gap: 0.3rem; margin-left: auto; }
+.loop button { padding: 0.3rem 0.55rem; font-size: 0.8rem; }
+.loop.on { color: var(--accent); }
+.loop-nudge { display: flex; gap: 0.2rem; }
+.loop-nudge button { padding: 0.25rem 0.4rem; }
+.loop-countin { display: flex; align-items: center; gap: 0.3rem; font-size: 0.78rem; }
+
+/* ---------------------------------------------------------------- transpose */
+
+.transpose {
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+}
+.transpose-row {
+  display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+.transpose-row label { display: flex; align-items: center; gap: 0.45rem; font-size: 0.85rem; color: var(--muted); }
+.transpose-label { font-size: 0.85rem; color: var(--muted); }
+.transpose-note { font-size: 0.8rem; margin: 0.35rem 0 0.75rem; max-width: 60ch; }
+
+.transpose-stepper { display: flex; align-items: center; gap: 0.4rem; }
+.transpose-stepper button { padding: 0.25rem 0.6rem; }
+.transpose-stepper button:disabled { opacity: 0.35; cursor: not-allowed; }
+.transpose-value {
+  font-variant-numeric: tabular-nums; font-weight: 600;
+  min-width: 2.2rem; text-align: center;
+}
+
+.transpose-progress {
+  height: 3px; background: var(--panel); border-radius: 2px;
+  overflow: hidden; margin: 0.4rem 0;
+}
+.transpose-progress div { height: 100%; background: var(--accent); transition: width 150ms ease; }
+.transpose-reset { font-size: 0.8rem; padding: 0.3rem 0.6rem; }
+
+/* ---------------------------------------------------------------- yt library */
+
+.yt-lib-head { display: flex; align-items: center; justify-content: space-between; }
+.yt-lib-tabs { display: flex; gap: 0.4rem; margin: 0.5rem 0 1rem; }
+.button.small, button.small { padding: 0.3rem 0.6rem; font-size: 0.8rem; }

@@ -21,6 +21,7 @@
  */
 
 import { PlaybackClock, epochToWall, now } from "./clock.ts";
+import { loopWrapTarget, type LoopRegion } from "./loop.ts";
 import type { Transport, TransportState } from "./transport";
 
 /** The slice of alphaTab's API we use. Typed structurally so alphaTab stays optional. */
@@ -73,6 +74,11 @@ export class SyncEngine {
 
   /** Set true while we are driving the transport from alphaTab, to avoid feedback. */
   private suppressHandler = false;
+
+  /** Active loop region, or null. Checked on every frame. */
+  private loop: LoopRegion | null = null;
+  private lastWrapAt = -Infinity;
+  private loopListeners = new Set<(region: LoopRegion | null) => void>();
 
   constructor(clock = new PlaybackClock(), options: SyncEngineOptions = {}) {
     this.clock = clock;
@@ -232,6 +238,18 @@ export class SyncEngine {
 
     const tick = () => {
       const pos = this.clock.positionForDisplay();
+
+      // Loop wrapping is checked here, on the frame loop, rather than on the slower
+      // transport poll: at 200ms poll intervals we could overshoot a loop end by a
+      // fifth of a second, which is audible and lands you in the next section.
+      if (this.loop?.enabled && this.clock.isPlaying) {
+        const target = loopWrapTarget(this.loop, pos, now(), this.lastWrapAt);
+        if (target !== null) {
+          this.lastWrapAt = now();
+          void this.seek(target);
+        }
+      }
+
       for (const cb of this.frameSubscribers) cb(pos);
       this.rafHandle = requestAnimationFrame(tick);
     };
@@ -264,8 +282,37 @@ export class SyncEngine {
     await this.transport?.seek(mediaMs);
   }
 
+  /** Re-export so callers don't need a second import for the loop types. */
+  static readonly version = 1;
+
   get duration(): number {
     return this.durationMs;
+  }
+
+  // ---------------------------------------------------------------- looping
+
+  get loopRegion(): LoopRegion | null {
+    return this.loop;
+  }
+
+  setLoop(region: LoopRegion | null): void {
+    this.loop = region;
+    this.lastWrapAt = -Infinity;
+    for (const cb of this.loopListeners) cb(region);
+
+    // Jump into the region immediately if we're outside it — otherwise enabling a loop
+    // appears to do nothing until playback happens to wander into range.
+    if (region?.enabled) {
+      const pos = this.clock.positionForDisplay();
+      if (pos < region.startMs || pos > region.endMs) {
+        void this.seek(region.startMs);
+      }
+    }
+  }
+
+  onLoopChange(cb: (region: LoopRegion | null) => void): () => void {
+    this.loopListeners.add(cb);
+    return () => this.loopListeners.delete(cb);
   }
 
   destroy(): void {
@@ -281,3 +328,4 @@ export class SyncEngine {
 
 /** Re-exported so callers don't need to import from two places. */
 export { PlaybackClock, epochToWall, now };
+export type { LoopRegion };

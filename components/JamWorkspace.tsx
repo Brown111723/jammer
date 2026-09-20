@@ -18,11 +18,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChordPanel } from "./ChordPanel";
+import { LoopControls } from "./LoopControls";
+import { TransposePanel } from "./TransposePanel";
 import { FretboardHighway } from "./FretboardHighway";
 import { LyricsView } from "./LyricsView";
 import { SyncEditor } from "./SyncEditor";
 import { TabView } from "./TabView";
 import { buildHighwayNotes } from "../lib/fretboard";
+import { applyFretboard, DEFAULT_FRETBOARD, type FretboardConfig } from "../lib/transpose";
 import { saveSyncPoints } from "../lib/chart-store";
 import type { SyncEngine } from "../lib/sync-engine";
 import {
@@ -45,6 +48,11 @@ export interface JamWorkspaceProps {
   score: ArrayBuffer | string | null;
   onScoreTracksLoaded?: (tracks: { index: number; name: string }[]) => void;
   scoreTrackIndex?: number;
+  /** Only local files can have their audio pitch-shifted. */
+  canShiftAudio?: boolean;
+  audioSemitones?: number;
+  onAudioShift?: (semitones: number) => void;
+  shiftProgress?: number | null;
 }
 
 export function JamWorkspace({
@@ -55,6 +63,10 @@ export function JamWorkspace({
   score,
   onScoreTracksLoaded,
   scoreTrackIndex = 0,
+  canShiftAudio = false,
+  audioSemitones = 0,
+  onAudioShift,
+  shiftProgress = null,
 }: JamWorkspaceProps) {
   const [view, setView] = useState<JamView>("split");
   const [trackId, setTrackId] = useState<string | null>(null);
@@ -62,6 +74,9 @@ export function JamWorkspace({
   const [points, setPoints] = useState<SyncPoint[]>([]);
   const [lookAhead, setLookAhead] = useState(3000);
   const [showLyrics, setShowLyrics] = useState(true);
+  const [fretboard, setFretboard] = useState<FretboardConfig>(DEFAULT_FRETBOARD);
+  const [showTranspose, setShowTranspose] = useState(false);
+  const [countIn, setCountIn] = useState(false);
 
   // Adopt the chart's sync points when the chart changes.
   useEffect(() => {
@@ -93,9 +108,16 @@ export function JamWorkspace({
     [points, chart],
   );
 
+  // Everything downstream reads the adjusted chart, so capo/tuning changes flow
+  // through the highway, the chord panel and the notation together.
+  const adjusted = useMemo(
+    () => (chart ? applyFretboard(chart, fretboard) : null),
+    [chart, fretboard],
+  );
+
   const activeTrack = useMemo(
-    () => chart?.tracks.find((t) => t.id === trackId) ?? null,
-    [chart, trackId],
+    () => adjusted?.tracks.find((t) => t.id === trackId) ?? null,
+    [adjusted, trackId],
   );
 
   const highwayNotes = useMemo(
@@ -105,12 +127,12 @@ export function JamWorkspace({
 
   const chordEvents = useMemo(
     () =>
-      (chart?.chords ?? []).map((c) => ({
+      (adjusted?.chords ?? []).map((c) => ({
         mediaMs: tickMap.tickToMs(c.tick),
         symbol: c.symbol,
         confidence: c.confidence,
       })),
-    [chart, tickMap],
+    [adjusted, tickMap],
   );
 
   const stringCount = activeTrack?.tuning?.strings.length ?? 6;
@@ -151,14 +173,14 @@ export function JamWorkspace({
           ))}
         </div>
 
-        {chart && chart.tracks.length > 0 && (
+        {adjusted && adjusted.tracks.length > 0 && (
           <label className="workspace-track">
             Part
             <select
               value={trackId ?? ""}
               onChange={(e) => setTrackId(e.target.value)}
             >
-              {chart.tracks.map((t) => (
+              {adjusted.tracks.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
                   {t.source === "analyzer" ? " (auto)" : ""}
@@ -191,13 +213,39 @@ export function JamWorkspace({
         </button>
 
         <button
+          className={showTranspose ? "active" : ""}
+          onClick={() => setShowTranspose((v) => !v)}
+          title="Tuning, capo and pitch"
+        >
+          Transpose
+        </button>
+
+        <button
           className={syncOpen ? "active" : ""}
           onClick={() => setSyncOpen((v) => !v)}
           title="Align the chart to this recording"
         >
           Align
         </button>
+
+        <LoopControls
+          engine={engine}
+          beats={chart?.beatGrid?.beats}
+          countIn={countIn}
+          onCountInChange={setCountIn}
+        />
       </div>
+
+      {showTranspose && (
+        <TransposePanel
+          config={fretboard}
+          onChange={setFretboard}
+          canShiftAudio={canShiftAudio}
+          audioSemitones={audioSemitones}
+          onAudioShift={onAudioShift}
+          shiftProgress={shiftProgress}
+        />
+      )}
 
       {activeTrack?.source === "analyzer" && (
         <p className="workspace-notice">

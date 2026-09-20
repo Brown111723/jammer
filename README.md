@@ -95,6 +95,11 @@ lib/types.ts               JammerChart format, TickMap, sync points
 lib/transport.ts           the interface every playback source implements
 lib/transports/            spotify (Web Playback SDK) · youtube (IFrame) · local
 lib/youtube.ts             URL parsing, Data API search, title heuristics
+lib/youtube-library.ts     signed-in playlists and liked music
+lib/google-auth.ts         Google PKCE (token exchange is server-side — see below)
+lib/loop.ts                loop regions, bar snapping
+lib/transpose.ts           tuning/capo re-fretting, chord transposition
+lib/pitch-shift.ts         phase vocoder with identity phase locking
 lib/spotify-auth.ts        PKCE, no client secret
 lib/spotify-api.ts         only the endpoints that still exist
 lib/lyrics.ts              LRCLIB client + LRC parser
@@ -114,6 +119,7 @@ components/LyricsView.tsx     synced / unsynced / instrumental
 components/LatencyCalibrator.tsx   ← do not skip this
 analyzer/pipeline.py       Demucs → beats → key → chords → pitch → frets
 analyzer/main.py           FastAPI, queued jobs
+app/api/youtube/token      server-side OAuth exchange (Google requires a secret)
 app/dev/highway            visual harness for tuning the highway
 test/                      clock simulation, chart/lyrics, fretboard
 ```
@@ -127,8 +133,9 @@ There is **no official YouTube Music API**. What works, and what doesn't:
 | Play any track | ✅ IFrame Player API — official, free, no Premium |
 | Slow down / speed up | ✅ 0.25×–2×. **Spotify cannot do this at all** |
 | Search | ✅ Data API v3. Needs a free key. ~100 searches/day on the free quota |
-| Your YTM playlists | ⚠️ Backed by YouTube playlists, so reachable via OAuth (not wired yet) |
-| Your "Liked Music" | ❌ A YTM-only auto-playlist. No official API exposes it |
+| Your YTM playlists | ✅ Sign in with Google — they're backed by YouTube playlists |
+| Your liked songs | ✅ via liked videos (see below) |
+| The `LM` "Liked Music" playlist itself | ❌ No official API exposes it — we fall back to liked videos, which overlap heavily, and say which one you're seeing |
 | YTM uploads | ❌ Not exposed |
 
 **Paste-a-link is the primary path**, not a fallback: it needs no auth and no quota,
@@ -141,6 +148,35 @@ Two things to expect: official music videos from major labels often **block embe
 (error 101/150) — look for the "Artist - Topic" upload, which is the YouTube Music
 audio track and is almost always embeddable. And the player stays visible, because
 YouTube's terms require it.
+
+## Practice tools
+
+**Loop a section.** `A` sets the loop start at the playhead, `B` the end, `L` toggles.
+Both snap to the nearest downbeat when there's a beat grid — a loop set by eye clips the
+downbeat and lands differently every repetition; snapped, it's the same eight bars every
+time. Arrows move the loop a whole section at a time ("now the next eight").
+
+**Slow down.** YouTube and local files only; Spotify's SDK has no rate control.
+
+**Transpose** — and here there are two different operations that get confused:
+
+| | What changes | Matches the recording? | Works on |
+|---|---|---|---|
+| Tuning / capo | Where your fingers go | ✅ Yes | Every transport |
+| Audio pitch | The actual sound | ✅ Yes | **Local files only** |
+
+Streamed audio is DRM-protected, so there are no samples to pitch-shift. But for the
+most common real case — a song recorded a half step down, which covers a huge amount of
+rock — the *fingering* transform is the better answer anyway: tune to Eb, Jammer
+re-frets the chart, and you play familiar shapes that sound right against the untouched
+recording. Nothing is degraded by resampling.
+
+For local files, `lib/pitch-shift.ts` is a real phase vocoder: FFT, per-bin true
+frequency from phase advance, and **identity phase locking** so spectral peaks stay
+coherent. Without the locking pass, a stretched sine came out 18 dB down while still
+reporting the right pitch — the partials in adjacent bins drift apart and cancel. It's
+tested against synthetic tones: +12 semitones must double the frequency and leave the
+duration alone.
 
 ## The fretboard highway
 
@@ -175,7 +211,8 @@ what you *hear* rather than to what the peaks look like.
 ## Tests
 
 ```bash
-npm test                      # 38 tests: clock sim, TickMap, LRC, voicings, alignment, YT links
+npm test                      # 49 tests: clock, TickMap, LRC, voicings, alignment,
+                              #           YT links, FFT + phase vocoder
 cd analyzer && python3 test_pipeline.py   # 37 checks: fretting, beats, chords
 ```
 
@@ -210,12 +247,16 @@ Built and verified (`npx next build` is clean; both suites pass):
 - [x] Sync-point editor (nudge / two-point / tap) with validation
 - [x] Persistence for charts and alignments, with JSON export/import
 - [x] YouTube transport — paste-a-link, search, slow-down practice
+- [x] YouTube sign-in — your playlists and liked songs
+- [x] Section looping with bar snapping
+- [x] Tuning / capo re-fretting (every transport)
+- [x] Audio pitch shifting via phase vocoder (local files)
 
 Not done:
 
 - [ ] Drum tab from the drums stem
-- [ ] Loop a section / count-in / mute-a-stem
-- [ ] YouTube OAuth for your own playlists
+- [ ] Count-in clicks before a loop restarts
+- [ ] Mute-a-stem (needs the analyzer's Demucs output plumbed to playback)
 - [ ] Server-side persistence — charts live in localStorage, which is one
       "clear site data" away from gone. Export regularly until this lands.
 - [ ] Note-level editing (you can fix the alignment, not yet fix a wrong fret)

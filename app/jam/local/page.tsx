@@ -23,6 +23,7 @@ import {
 } from "../../../lib/analyzer-client";
 import { chartForRecording, saveChart } from "../../../lib/chart-store";
 import { fetchLyrics } from "../../../lib/lyrics";
+import { bufferToWav, pitchShiftBuffer } from "../../../lib/pitch-shift";
 import { SyncEngine } from "../../../lib/sync-engine";
 import { LocalTransport } from "../../../lib/transports/local-transport";
 import type { JammerChart, Lyrics, RecordingRef } from "../../../lib/types";
@@ -45,6 +46,13 @@ export default function LocalJamPage() {
   const [lyrics, setLyrics] = useState<Lyrics | null>(null);
   const [calibrating, setCalibrating] = useState(false);
   const [ready, setReady] = useState(false);
+
+  const [audioSemitones, setAudioSemitones] = useState(0);
+  const [shiftProgress, setShiftProgress] = useState<number | null>(null);
+  const decodedRef = useRef<AudioBuffer | null>(null);
+  // Rendered variants, keyed by semitone, so flipping back and forth is instant.
+  const shiftCacheRef = useRef<Map<number, string>>(new Map());
+  const originalUrlRef = useRef<string | null>(null);
 
   const [analyzerUp, setAnalyzerUp] = useState<boolean | null>(null);
   const [job, setJob] = useState<JobState | null>(null);
@@ -72,7 +80,16 @@ export default function LocalJamPage() {
 
   const onAudioFile = useCallback(async (picked: File) => {
     if (!audioRef.current) return;
-    audioRef.current.src = URL.createObjectURL(picked);
+
+    // Drop any previously rendered variants — they belong to the old file.
+    for (const url of shiftCacheRef.current.values()) URL.revokeObjectURL(url);
+    shiftCacheRef.current.clear();
+    decodedRef.current = null;
+    setAudioSemitones(0);
+
+    const url = URL.createObjectURL(picked);
+    originalUrlRef.current = url;
+    audioRef.current.src = url;
     setFile(picked);
 
     // Identity for a local file: name + size is stable enough to re-find its chart,
@@ -123,6 +140,75 @@ export default function LocalJamPage() {
       setJob(null);
     }
   }, [file, recording]);
+
+  /**
+   * Render the file at a different pitch and swap it into the <audio> element.
+   *
+   * Only possible because this is a local file: we own the samples. On Spotify or
+   * YouTube the audio never leaves the DRM pipeline, which is why the control is
+   * disabled there rather than merely slow.
+   */
+  const shiftAudio = useCallback(
+    async (semitones: number) => {
+      const audio = audioRef.current;
+      if (!audio || !file) return;
+
+      const resume = audio.currentTime;
+      const wasPlaying = !audio.paused;
+
+      const swap = (src: string) => {
+        audio.src = src;
+        // Restoring position matters: re-rendering mid-practice and being thrown back
+        // to bar 1 would make the feature unusable.
+        audio.currentTime = resume;
+        if (wasPlaying) void audio.play();
+        engine.clock.seek(resume * 1000);
+        setAudioSemitones(semitones);
+      };
+
+      if (semitones === 0) {
+        if (originalUrlRef.current) swap(originalUrlRef.current);
+        return;
+      }
+
+      const cached = shiftCacheRef.current.get(semitones);
+      if (cached) {
+        swap(cached);
+        return;
+      }
+
+      setShiftProgress(0);
+      try {
+        if (!decodedRef.current) {
+          const ctx = new AudioContext();
+          decodedRef.current = await ctx.decodeAudioData(await file.arrayBuffer());
+          void ctx.close();
+        }
+
+        const offline = new OfflineAudioContext(
+          decodedRef.current.numberOfChannels,
+          decodedRef.current.length,
+          decodedRef.current.sampleRate,
+        );
+
+        const shifted = await pitchShiftBuffer(
+          offline,
+          decodedRef.current,
+          semitones,
+          setShiftProgress,
+        );
+
+        const url = URL.createObjectURL(bufferToWav(shifted));
+        shiftCacheRef.current.set(semitones, url);
+        swap(url);
+      } catch (err) {
+        console.error("[jammer] pitch shift failed", err);
+      } finally {
+        setShiftProgress(null);
+      }
+    },
+    [file, engine],
+  );
 
   const commitLatency = useCallback(
     (ms: number) => {
@@ -234,6 +320,10 @@ export default function LocalJamPage() {
           score={score}
           scoreTrackIndex={scoreTrackIndex}
           onScoreTracksLoaded={setScoreTracks}
+          canShiftAudio
+          audioSemitones={audioSemitones}
+          onAudioShift={(n) => void shiftAudio(n)}
+          shiftProgress={shiftProgress}
         />
       ) : (
         <Placeholder analyzerUp={analyzerUp} />

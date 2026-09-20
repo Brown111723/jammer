@@ -15,6 +15,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { YouTubeLibrary } from "../../components/YouTubeLibrary";
 import {
   parseStartSeconds,
   parseVideoId,
@@ -134,6 +135,8 @@ export default function YouTubePage() {
         </div>
         {pasteError && <p className="warn">{pasteError}</p>}
       </section>
+
+      <YouTubeLibrary onPick={(v) => open(v.id, v.title)} />
 
       {recent.length > 0 && (
         <section>
