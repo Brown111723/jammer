@@ -112,6 +112,50 @@ export function parseStartSeconds(input: string): number {
   }
 }
 
+// ---------------------------------------------------------------- oEmbed
+
+/**
+ * Title and channel for a video, with NO API key and NO quota.
+ *
+ * YouTube's oEmbed endpoint is public, CORS-enabled and unmetered. It returns exactly
+ * the two fields we need to look up lyrics — `title` and `author_name`.
+ *
+ * This matters more than it looks: metadata used to be gated behind the Data API key,
+ * so a user who just pasted a link got no lyrics at all. Lyrics are the one piece of
+ * this app that can be fully automatic for any song, and requiring a Google Cloud
+ * project to get them was indefensible.
+ *
+ * The Data API is still worth using when a key exists — it also gives the duration,
+ * which sharpens the LRCLIB match — but it is no longer required.
+ */
+export async function fetchOEmbedMeta(
+  videoId: string,
+): Promise<{ title: string; channel: string; thumbnail?: string } | null> {
+  const target = `https://www.youtube.com/watch?v=${videoId}`;
+  const url = `https://www.youtube.com/oembed?url=${encodeURIComponent(target)}&format=json`;
+
+  try {
+    const res = await fetch(url);
+    // 401/404 here means private, deleted, or embedding disabled.
+    if (!res.ok) return null;
+
+    const json = (await res.json()) as {
+      title?: string;
+      author_name?: string;
+      thumbnail_url?: string;
+    };
+    if (!json.title) return null;
+
+    return {
+      title: decodeEntities(json.title),
+      channel: decodeEntities(json.author_name ?? ""),
+      thumbnail: json.thumbnail_url,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------- Data API
 
 export interface YouTubeVideo {

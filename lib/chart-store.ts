@@ -213,3 +213,86 @@ export async function importAll(file: File): Promise<{ charts: number }> {
 
   return { charts: Object.keys(payload.charts ?? {}).length };
 }
+
+// ---------------------------------------------------------------- matching
+
+/**
+ * Find a chart for a song by its metadata, regardless of which recording produced it.
+ *
+ * This is what makes analysis worth doing once. The chart format is deliberately
+ * recording-independent — musical time in ticks, with a per-recording sync set — so a
+ * chart built from your local copy of a song is equally valid against the YouTube
+ * upload, the Spotify track and the remaster. It just needs to be *found*.
+ *
+ * Matching is on normalised title and artist, with duration as a tiebreaker rather
+ * than a gate: the same song on YouTube is routinely a few seconds longer than the
+ * album cut (intros, applause, an outro that fades later), so a strict duration match
+ * would reject correct hits. Alignment is the sync editor's job, not the matcher's.
+ */
+export function normaliseForMatch(text: string): string {
+  return text
+    .toLowerCase()
+    // Strip the noise that YouTube titles carry and album metadata doesn't.
+    .replace(
+      /[([]\s*(official\s*)?(music\s*)?(lyric\s*)?(video|audio|visualizer|hd|4k|remaster(ed)?(\s*\d{4})?|explicit|clean|mv|live|acoustic|demo|version)\s*[)\]]/g,
+      "",
+    )
+    .replace(/\s*[-–—]\s*topic$/, "")
+    .replace(/feat\.?|ft\.?|featuring/g, "")
+    // Punctuation and spacing vary constantly between sources.
+    .replace(/[^\p{L}\p{N}]+/gu, "")
+    .trim();
+}
+
+export interface ChartMatch {
+  chart: JammerChart;
+  /** 0..1 — how confident the match is. */
+  score: number;
+  /** True when this chart has already been aligned to this exact recording. */
+  exact: boolean;
+}
+
+export async function findChartForSong(
+  title: string,
+  artist: string,
+  recording?: RecordingRef,
+): Promise<ChartMatch | null> {
+  // An exact prior alignment always wins — it means someone already did this.
+  if (recording) {
+    const linked = await chartForRecording(recording);
+    if (linked) return { chart: linked, score: 1, exact: true };
+  }
+
+  const wantTitle = normaliseForMatch(title);
+  const wantArtist = normaliseForMatch(artist);
+  if (!wantTitle) return null;
+
+  let best: ChartMatch | null = null;
+
+  for (const chart of await listCharts()) {
+    const haveTitle = normaliseForMatch(chart.title);
+    const haveArtist = normaliseForMatch(chart.artist);
+    if (!haveTitle) continue;
+
+    let score = 0;
+    if (haveTitle === wantTitle) score += 0.7;
+    else if (haveTitle.includes(wantTitle) || wantTitle.includes(haveTitle)) score += 0.45;
+    else continue; // Title has to be in the ballpark or it's a different song.
+
+    if (wantArtist && haveArtist) {
+      if (haveArtist === wantArtist) score += 0.3;
+      else if (haveArtist.includes(wantArtist) || wantArtist.includes(haveArtist)) {
+        score += 0.2;
+      }
+    } else {
+      // No artist to compare — a title-only match is weaker but still useful.
+      score += 0.1;
+    }
+
+    if (!best || score > best.score) best = { chart, score, exact: false };
+  }
+
+  // Below this, it's guessing. A wrong chart is worse than none: the cursor runs over
+  // notes that were never in the song.
+  return best && best.score >= 0.55 ? best : null;
+}

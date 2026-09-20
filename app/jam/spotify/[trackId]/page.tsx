@@ -17,7 +17,7 @@ import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { JamWorkspace } from "../../../../components/JamWorkspace";
 import { LatencyCalibrator } from "../../../../components/LatencyCalibrator";
 import { Transport } from "../../../../components/Transport";
-import { chartForRecording } from "../../../../lib/chart-store";
+import { findChartForSong } from "../../../../lib/chart-store";
 import { fetchLyrics } from "../../../../lib/lyrics";
 import { artistNames, spotify, type SpotifyTrack } from "../../../../lib/spotify-api";
 import { SyncEngine } from "../../../../lib/sync-engine";
@@ -88,12 +88,17 @@ export default function SpotifyJamPage({
       .catch(() => setTrack(null));
   }, [trackId]);
 
-  // A chart previously aligned to this recording, if there is one.
+  // Any chart for this song, from any source — the format is recording-independent,
+  // so one analysed from a local file applies to this Spotify track too.
   useEffect(() => {
-    void chartForRecording({ transport: "spotify", id: trackId }).then((found) => {
-      if (found) setChart(found);
+    if (!track) return;
+    void findChartForSong(track.name, track.artists[0]?.name ?? "", {
+      transport: "spotify",
+      id: trackId,
+    }).then((match) => {
+      if (match) setChart(match.chart);
     });
-  }, [trackId]);
+  }, [trackId, track]);
 
   useEffect(() => {
     if (status.kind !== "ready" || !transport || !track || startedRef.current) return;

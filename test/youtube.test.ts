@@ -123,3 +123,34 @@ test("YouTube error codes become advice, not numbers", () => {
   assert.match(youtubeErrorMessage(2).message, /valid/i);
   assert.match(youtubeErrorMessage(999).message, /999/, "unknown codes still surface");
 });
+
+test("chart matching normalises the noise that differs between sources", async () => {
+  const { normaliseForMatch } = await import("../lib/chart-store.ts");
+
+  // The same song, as it appears on YouTube vs. in an album tag.
+  assert.equal(
+    normaliseForMatch("Black Dog (Remaster 2007)"),
+    normaliseForMatch("Black Dog"),
+  );
+  assert.equal(
+    normaliseForMatch("Come As You Are (Official Music Video)"),
+    normaliseForMatch("Come as you are"),
+  );
+  assert.equal(
+    normaliseForMatch("Led Zeppelin - Topic"),
+    normaliseForMatch("Led Zeppelin"),
+  );
+  // Punctuation and spacing vary constantly.
+  assert.equal(
+    normaliseForMatch("Don't Stop Me Now"),
+    normaliseForMatch("Dont Stop Me Now"),
+  );
+  assert.equal(
+    normaliseForMatch("Say It Ain't So"),
+    normaliseForMatch("say it aint so"),
+  );
+
+  // But genuinely different songs must not collide.
+  assert.notEqual(normaliseForMatch("Black Dog"), normaliseForMatch("Black Hole Sun"));
+  assert.notEqual(normaliseForMatch("One"), normaliseForMatch("One Step Closer"));
+});

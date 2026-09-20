@@ -17,10 +17,15 @@ import { JamWorkspace } from "../../../../components/JamWorkspace";
 import { LatencyCalibrator } from "../../../../components/LatencyCalibrator";
 import { Transport } from "../../../../components/Transport";
 import { useYouTubePlayer } from "../../../../hooks/useYouTubePlayer";
-import { chartForRecording } from "../../../../lib/chart-store";
+import { findChartForSong } from "../../../../lib/chart-store";
 import { fetchLyrics } from "../../../../lib/lyrics";
 import { SyncEngine } from "../../../../lib/sync-engine";
-import { getVideos, guessArtistTitle, searchAvailable } from "../../../../lib/youtube";
+import {
+  fetchOEmbedMeta,
+  getVideos,
+  guessArtistTitle,
+  searchAvailable,
+} from "../../../../lib/youtube";
 import type { JammerChart, Lyrics, RecordingRef } from "../../../../lib/types";
 
 const LATENCY_KEY = "jammer.outputLatencyMs";
@@ -47,6 +52,8 @@ export default function YouTubeJamPage({
   const [scoreTracks, setScoreTracks] = useState<{ index: number; name: string }[]>([]);
   const [scoreTrackIndex, setScoreTrackIndex] = useState(0);
   const [calibrating, setCalibrating] = useState(false);
+  /** Whether the chart was aligned to this exact video, or matched from another one. */
+  const [chartMatch, setChartMatch] = useState<"exact" | "matched" | null>(null);
   const attachedRef = useRef(false);
 
   const recording: RecordingRef = useMemo(
@@ -66,38 +73,80 @@ export default function YouTubeJamPage({
     engine.attachTransport(transport);
   }, [transport, engine]);
 
-  // Metadata, if an API key is configured. Costs 1 quota unit, versus 100 for a search.
+  /**
+   * Everything that can be automatic, is.
+   *
+   * On load: get the title via oEmbed (no key, no quota), then look up synced lyrics
+   * on LRCLIB and search for a chart that already covers this song. Nothing here asks
+   * the user for anything.
+   *
+   * The Data API is used only as an upgrade when a key exists — it adds the duration,
+   * which makes the LRCLIB match more precise.
+   */
   useEffect(() => {
-    if (!searchAvailable()) return;
-    void getVideos([videoId])
-      .then(async (videos) => {
-        const v = videos[0];
-        if (!v) return;
-        setMeta({ title: v.title, channel: v.channel });
+    let cancelled = false;
 
-        const { artist, title } = guessArtistTitle(v.title, v.channel);
+    void (async () => {
+      // oEmbed first: it always works.
+      let title: string | undefined;
+      let channel: string | undefined;
+      let durationMs: number | undefined;
+
+      const basic = await fetchOEmbedMeta(videoId);
+      if (basic) {
+        title = basic.title;
+        channel = basic.channel;
+        if (!cancelled) setMeta({ title: basic.title, channel: basic.channel });
+      }
+
+      // Upgrade with the Data API if a key is configured — mainly for the duration.
+      if (searchAvailable()) {
         try {
-          setLyrics(
-            await fetchLyrics(
-              title,
-              artist,
-              undefined,
-              v.durationSec ? v.durationSec * 1000 : undefined,
-            ),
-          );
+          const v = (await getVideos([videoId]))[0];
+          if (v) {
+            title = v.title;
+            channel = v.channel;
+            durationMs = v.durationSec ? v.durationSec * 1000 : undefined;
+            if (!cancelled) setMeta({ title: v.title, channel: v.channel });
+          }
         } catch {
-          setLyrics(null);
+          /* the oEmbed data is enough */
         }
-      })
-      .catch(() => {
-        /* metadata is a nicety; the player works without it */
-      });
-  }, [videoId]);
+      }
 
-  useEffect(() => {
-    void chartForRecording({ transport: "youtube", id: videoId }).then((found) => {
-      if (found) setChart(found);
-    });
+      if (!title || cancelled) return;
+
+      const guessed = guessArtistTitle(title, channel ?? "");
+
+      // Lyrics — fully automatic, every time, for any song LRCLIB knows.
+      try {
+        const found = await fetchLyrics(
+          guessed.title,
+          guessed.artist,
+          undefined,
+          durationMs,
+        );
+        if (!cancelled) setLyrics(found);
+      } catch {
+        if (!cancelled) setLyrics(null);
+      }
+
+      // A chart from ANY source counts: the format is recording-independent, so one
+      // analysed locally applies here too. This is what makes analysing a song once
+      // worth doing.
+      const match = await findChartForSong(guessed.title, guessed.artist, {
+        transport: "youtube",
+        id: videoId,
+      });
+      if (match && !cancelled) {
+        setChart(match.chart);
+        setChartMatch(match.exact ? "exact" : "matched");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [videoId]);
 
   const commitLatency = useCallback(
