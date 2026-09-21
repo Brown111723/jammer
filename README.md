@@ -44,6 +44,21 @@ reports into a smooth 60 fps cursor without visible jumps.
 
 ---
 
+## Updating (Termux on Android)
+
+Download the new `jammer.tar.gz`, then run this one line from anywhere:
+
+```bash
+f=$(ls -t ~/storage/downloads/jammer*.tar.gz | head -1) && tar -xzf "$f" -C ~ && bash ~/jammer/scripts/update.sh
+```
+
+It extracts the **newest** download (Android names repeats `jammer (1).tar.gz`,
+`jammer (2).tar.gz`…), installs dependencies, pushes to GitHub, clears the old tarballs,
+and starts the app. Your `.env.local` is never in the tarball, so it survives.
+
+Check the version in the home-page footer — `vX.Y.Z · build N · hash`. The version
+goes up each iteration (see `CHANGELOG.md`); the build number is the commit count.
+
 ## Quick start
 
 ```bash

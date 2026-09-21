@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { beginLogin, getStoredTokens, clearTokens } from "../lib/spotify-auth";
 import { spotify, type SpotifyProfile } from "../lib/spotify-api";
+import { versionLabel } from "../lib/version";
 
 export default function Home() {
   const [profile, setProfile] = useState<SpotifyProfile | null>(null);
@@ -104,6 +105,7 @@ export default function Home() {
           Web Playback SDK. Notation rendered with{" "}
           <a href="https://alphatab.net">alphaTab</a>.
         </p>
+        <p className="version">Jammer {versionLabel()}</p>
       </footer>
     </main>
   );
