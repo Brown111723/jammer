@@ -100,9 +100,11 @@ export function JamWorkspace({
     setPoints(set?.points ?? chart.syncSets[0]?.points ?? []);
   }, [chart, recording]);
 
-  // Default to the first playable track.
+  // Default to the first playable track — and pick again when a different chart
+  // arrives (a tab file replacing a chord sheet), or the old id points at nothing.
   useEffect(() => {
-    if (!chart || trackId) return;
+    if (!chart) return;
+    if (trackId && chart.tracks.some((t) => t.id === trackId)) return;
     const playable = chart.tracks.find((t) => (t.notes?.length ?? 0) > 0);
     setTrackId(playable?.id ?? chart.tracks[0]?.id ?? null);
   }, [chart, trackId]);
@@ -117,6 +119,36 @@ export function JamWorkspace({
     () => new TickMap(points, chart?.tempos[0]?.bpm ?? 120, chart?.ppq ?? PPQ),
     [points, chart],
   );
+
+  // A chart from a notation file carries the file's own timing. alphaTab's cursor and
+  // the beat grid are in that timing; the user's alignment maps ticks to THIS
+  // recording. Route both through ticks so the cursor, highway and loop points all
+  // follow the alignment.
+  const nativeMap = useMemo(
+    () =>
+      chart?.scoreTiming?.length
+        ? new TickMap(chart.scoreTiming, chart.tempos[0]?.bpm ?? 120, chart.ppq ?? PPQ)
+        : null,
+    [chart],
+  );
+
+  useEffect(() => {
+    if (!nativeMap) {
+      engine.setScoreTimeMap(null);
+      return;
+    }
+    engine.setScoreTimeMap({
+      toScore: (ms) => nativeMap.tickToMs(tickMap.msToTick(ms)),
+      fromScore: (ms) => tickMap.tickToMs(nativeMap.msToTick(ms)),
+    });
+    return () => engine.setScoreTimeMap(null);
+  }, [engine, nativeMap, tickMap]);
+
+  const beats = useMemo(() => {
+    const raw = chart?.beatGrid?.beats;
+    if (!raw || !nativeMap) return raw;
+    return raw.map((b) => ({ ...b, mediaMs: tickMap.tickToMs(nativeMap.msToTick(b.mediaMs)) }));
+  }, [chart, nativeMap, tickMap]);
 
   // Everything downstream reads the adjusted chart, so capo/tuning changes flow
   // through the highway, the chord panel and the notation together.
@@ -240,7 +272,7 @@ export function JamWorkspace({
 
         <LoopControls
           engine={engine}
-          beats={chart?.beatGrid?.beats}
+          beats={beats}
           countIn={countIn}
           onCountInChange={setCountIn}
         />
@@ -280,7 +312,7 @@ export function JamWorkspace({
                 <FretboardHighway
                   engine={engine}
                   notes={highwayNotes}
-                  beats={chart?.beatGrid?.beats}
+                  beats={beats}
                   stringCount={stringCount}
                   lookAheadMs={lookAhead}
                 />
@@ -290,8 +322,9 @@ export function JamWorkspace({
               <div className="placeholder">
                 <h2>No notes to play yet</h2>
                 <p className="muted">
-                  Run the analyzer on your own copy of the audio, or load a Guitar Pro
-                  file, and the highway will fill up.
+                  Load a tab file (Guitar Pro .gp/.gp5/.gpx or MusicXML) with the
+                  button at the top and the highway fills up. You only need to do it
+                  once per song.
                 </p>
               </div>
             )}

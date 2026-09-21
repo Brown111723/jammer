@@ -40,6 +40,20 @@ export function TabView({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // The renderer is created asynchronously (dynamic import), but the page usually
+  // mounts this component with the score ALREADY set. Loading the score from a normal
+  // effect therefore ran before the renderer existed, found nothing, and gave up — the
+  // file was never passed in and the view sat on "Rendering…" forever. The boot step
+  // now reads the latest score from these refs once the renderer is ready.
+  const scoreRef = useRef(score);
+  const trackIndexRef = useRef(trackIndex);
+  const onReadyRef = useRef(onReady);
+  const onTracksLoadedRef = useRef(onTracksLoaded);
+  scoreRef.current = score;
+  trackIndexRef.current = trackIndex;
+  onReadyRef.current = onReady;
+  onTracksLoadedRef.current = onTracksLoaded;
+
   useEffect(() => {
     let disposed = false;
     let api: AlphaTabApiLike | null = null;
@@ -55,6 +69,16 @@ export function TabView({
             // Serve these from /public/alphatab/ — see scripts/postinstall.
             fontDirectory: "/alphatab/font/",
             scriptFile: "/alphatab/alphaTab.min.js",
+            // Render on the main thread, not in a web worker.
+            //
+            // alphaTab locates its worker script relative to its own module URL. Under
+            // Next.js's bundler that URL becomes a file:///.../node_modules/... path
+            // the browser cannot fetch, so the worker never starts and the score is
+            // never drawn (alphaTab logs "Detected bundling with WebPack but
+            // @coderline/alphatab-webpack was not used"). The bundler plugin fixes
+            // that but ties us to webpack specifics; one score on the main thread is
+            // fast enough, and this works identically in dev, prod and on a phone.
+            useWorkers: false,
           },
           display: {
             staveProfile: "ScoreTab",
@@ -82,7 +106,13 @@ export function TabView({
             enableElementHighlighting: true,
             enableUserInteraction: true,
             scrollMode: alphaTab.ScrollMode.Continuous,
-            scrollElement: hostRef.current.parentElement ?? undefined,
+            // The element that actually scrolls: the notation pane in the workspace.
+            // (Pointing at a non-scrolling wrapper left the cursor moving off-screen
+            // while the view stayed on bar 1.)
+            scrollElement:
+              (hostRef.current.closest(".workspace-notation") as HTMLElement | null) ??
+              hostRef.current.parentElement ??
+              undefined,
           },
         }) as never as AlphaTabApiLike;
 
@@ -100,7 +130,7 @@ export function TabView({
         withEvents.scoreLoaded.on(((loaded: {
           tracks: { name: string }[];
         }) => {
-          onTracksLoaded?.(
+          onTracksLoadedRef.current?.(
             loaded.tracks.map((t, index) => ({ index, name: t.name })),
           );
         }) as never);
@@ -113,8 +143,17 @@ export function TabView({
           if (!disposed) setError(e?.message ?? "alphaTab failed to render.");
         }) as never);
 
-        engine.attachAlphaTab(api);
-        onReady?.(api);
+        // A failure to hook up cursor sync shouldn't stop the notation rendering.
+        // Show the score either way; say so if the cursor won't follow.
+        try {
+          engine.attachAlphaTab(api);
+        } catch (syncErr) {
+          console.warn("[jammer] cursor sync unavailable:", syncErr);
+        }
+        onReadyRef.current?.(api);
+
+        // Load whatever score arrived while alphaTab was still being imported.
+        loadInto(api, scoreRef.current, trackIndexRef.current);
       } catch (err) {
         if (!disposed) {
           setError(err instanceof Error ? err.message : String(err));
@@ -130,20 +169,47 @@ export function TabView({
       (api as never as { destroy?(): void } | null)?.destroy?.();
       apiRef.current = null;
     };
-  }, [engine, onReady, onTracksLoaded]);
+  }, [engine]);
 
-  // Load the score whenever it changes.
-  useEffect(() => {
-    const api = apiRef.current as never as {
+  function loadInto(
+    api: AlphaTabApiLike | null,
+    data: ArrayBuffer | string | null,
+    track: number,
+  ) {
+    const target = api as never as {
       load(data: unknown, tracks?: number[]): boolean;
       tex(source: string): void;
     } | null;
-    if (!api || !score) return;
+    if (!target || !data) return;
 
+    setError(null);
     setLoading(true);
-    if (typeof score === "string") api.tex(score);
-    else api.load(score, [trackIndex]);
-  }, [score, trackIndex]);
+    try {
+      if (typeof data === "string") {
+        target.tex(data);
+      } else {
+        // Pass a copy: alphaTab may hold on to or transfer the buffer, and the page
+        // keeps the original to reload when the track changes.
+        const ok = target.load(new Uint8Array(data.slice(0)), [track]);
+        if (ok === false) {
+          setError(
+            "alphaTab didn't recognise this file. Supported: Guitar Pro 3–7 " +
+              "(.gp3 .gp4 .gp5 .gpx .gp), MusicXML and alphaTex.",
+          );
+          setLoading(false);
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setLoading(false);
+    }
+  }
+
+  // A NEW score after the renderer exists. (The first one is picked up by boot.)
+  useEffect(() => {
+    if (apiRef.current) loadInto(apiRef.current, score, trackIndexRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [score]);
 
   // Switch rendered track without reloading the file.
   useEffect(() => {

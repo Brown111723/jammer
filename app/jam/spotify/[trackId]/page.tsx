@@ -16,6 +16,8 @@ import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { JamWorkspace } from "../../../../components/JamWorkspace";
 import { LatencyCalibrator } from "../../../../components/LatencyCalibrator";
+import { ScorePicker } from "../../../../components/ScorePicker";
+import { useScoreFile } from "../../../../hooks/useScoreFile";
 import { Transport } from "../../../../components/Transport";
 import { findChartForSong } from "../../../../lib/chart-store";
 import { fetchLyrics } from "../../../../lib/lyrics";
@@ -39,9 +41,6 @@ export default function SpotifyJamPage({
   const [track, setTrack] = useState<SpotifyTrack | null>(null);
   const [lyrics, setLyrics] = useState<Lyrics | null>(null);
   const [chart, setChart] = useState<JammerChart | null>(null);
-  const [score, setScore] = useState<ArrayBuffer | string | null>(null);
-  const [scoreTracks, setScoreTracks] = useState<{ index: number; name: string }[]>([]);
-  const [scoreTrackIndex, setScoreTrackIndex] = useState(0);
   const [calibrating, setCalibrating] = useState(false);
   const startedRef = useRef(false);
 
@@ -56,6 +55,15 @@ export default function SpotifyJamPage({
     }),
     [trackId, track],
   );
+
+  const scoreFile = useScoreFile({
+    recording,
+    title: track?.name,
+    artist: track?.artists[0]?.name,
+    chart,
+    setChart,
+  });
+  const { score } = scoreFile;
 
   useEffect(() => {
     const saved = Number(localStorage.getItem(LATENCY_KEY) ?? "0");
@@ -135,34 +143,13 @@ export default function SpotifyJamPage({
 
       <header className="jam-header">
         <Link href="/library">← Library</Link>
-        <div className="file-inputs">
-          <label>
-            Score
-            <input
-              type="file"
-              accept=".gp,.gp3,.gp4,.gp5,.gpx,.musicxml,.xml"
-              onChange={async (e) => {
-                const f = e.target.files?.[0];
-                if (f) setScore(await f.arrayBuffer());
-              }}
-            />
-          </label>
-          {scoreTracks.length > 1 && (
-            <label>
-              Staff
-              <select
-                value={scoreTrackIndex}
-                onChange={(e) => setScoreTrackIndex(Number(e.target.value))}
-              >
-                {scoreTracks.map((t) => (
-                  <option key={t.index} value={t.index}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-        </div>
+        <ScorePicker
+          scoreName={scoreFile.scoreName}
+          scoreTracks={scoreFile.scoreTracks}
+          scoreTrackIndex={scoreFile.scoreTrackIndex}
+          onTrackIndex={scoreFile.setScoreTrackIndex}
+          onFile={(f) => void scoreFile.openScoreFile(f)}
+        />
       </header>
 
       {status.kind === "error" && (
@@ -187,6 +174,15 @@ export default function SpotifyJamPage({
         onCalibrate={() => setCalibrating(true)}
       />
 
+      {scoreFile.scoreMessage && (
+        <p className="workspace-notice ok" role="status">
+          {scoreFile.scoreMessage}{" "}
+          <button className="linkish" onClick={scoreFile.dismissScoreMessage}>
+            OK
+          </button>
+        </p>
+      )}
+
       {!chart && !score && (
         <p className="workspace-notice">
           No chart for this track yet. Load a Guitar Pro file, or transcribe your own
@@ -202,8 +198,8 @@ export default function SpotifyJamPage({
         recording={recording}
         lyrics={lyrics}
         score={score}
-        scoreTrackIndex={scoreTrackIndex}
-        onScoreTracksLoaded={setScoreTracks}
+        scoreTrackIndex={scoreFile.scoreTrackIndex}
+        onScoreTracksLoaded={scoreFile.setScoreTracks}
         songTitle={track?.name}
         songArtist={track ? artistNames(track) : undefined}
         onChartImported={setChart}

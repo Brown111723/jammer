@@ -25,6 +25,13 @@ import { loopWrapTarget, type LoopRegion } from "./loop.ts";
 import type { Transport, TransportState } from "./transport";
 
 /** The slice of alphaTab's API we use. Typed structurally so alphaTab stays optional. */
+export interface ScoreTimeMap {
+  /** Recording ms -> the notation file's own ms. */
+  toScore(ms: number): number;
+  /** The notation file's own ms -> recording ms. */
+  fromScore(ms: number): number;
+}
+
 export interface AlphaTabExternalMediaHandler {
   readonly backingTrackDuration: number;
   playbackRate: number;
@@ -65,6 +72,14 @@ export class SyncEngine {
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private pushTimer: ReturnType<typeof setInterval> | null = null;
+  /**
+   * alphaTab moves its cursor by ITS idea of time: the file's own tempo map. A real
+   * recording drifts from that (different lead-in, a live feel, a slightly different
+   * tempo), and the user's alignment captures the difference. This converts between
+   * recording time and the file's time so the notation cursor follows the alignment,
+   * not the file's metronome. Null = the two are the same.
+   */
+  private scoreTime: ScoreTimeMap | null = null;
   private rafHandle: number | null = null;
   private unsubscribeTransport: (() => void) | null = null;
 
@@ -161,8 +176,10 @@ export class SyncEngine {
       },
       seekTo(timeMs: number) {
         if (engine.suppressHandler) return;
-        // alphaTab asks in chart time; convert back through the offsets the clock applies.
-        const mediaMs = timeMs + engine.clock.outputLatencyMs + engine.clock.chartOffsetMs;
+        // alphaTab asks in its own time; convert to recording time, then back through
+        // the offsets the clock applies.
+        const chartMs = engine.scoreTime ? engine.scoreTime.fromScore(timeMs) : timeMs;
+        const mediaMs = chartMs + engine.clock.outputLatencyMs + engine.clock.chartOffsetMs;
         engine.clock.seek(mediaMs);
         void engine.transport?.seek(mediaMs);
       },
@@ -179,6 +196,11 @@ export class SyncEngine {
     this.pushTimer = setInterval(() => {
       this.push();
     }, this.opts.pushIntervalMs);
+  }
+
+  setScoreTimeMap(map: ScoreTimeMap | null): void {
+    this.scoreTime = map;
+    this.push();
   }
 
   detachAlphaTab(): void {
@@ -229,7 +251,8 @@ export class SyncEngine {
 
   private push(): void {
     if (!this.output) return;
-    this.output.updatePosition(this.clock.positionForDisplay());
+    const pos = this.clock.positionForDisplay();
+    this.output.updatePosition(this.scoreTime ? this.scoreTime.toScore(pos) : pos);
   }
 
   private startFrameLoop(): void {

@@ -239,6 +239,19 @@ export interface JammerChart {
   updatedAt: string;
 
   /**
+   * For a chart imported from a notation file (Guitar Pro, MusicXML): the file's OWN
+   * tick-to-millisecond mapping, from its tempo map with repeats expanded.
+   *
+   * alphaTab places its cursor using this native timing. When the user re-aligns the
+   * chart to a recording, the highway follows the new sync points; converting through
+   * this map lets the notation cursor follow the same alignment instead of drifting.
+   */
+  scoreTiming?: SyncPoint[];
+
+  /** Present when the original notation file is stored alongside the chart. */
+  scoreFile?: { name: string; size: number };
+
+  /**
    * Analyzer confidence summary, 0..1 per facet. Drive UI honesty from this: a chord
    * track at 0.4 should look visibly provisional, not authoritative.
    */

@@ -12,6 +12,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { JamWorkspace } from "../../../components/JamWorkspace";
 import { LatencyCalibrator } from "../../../components/LatencyCalibrator";
+import { ScorePicker } from "../../../components/ScorePicker";
+import { useScoreFile } from "../../../hooks/useScoreFile";
 import { Transport } from "../../../components/Transport";
 import {
   analyzerAvailable,
@@ -39,9 +41,6 @@ export default function LocalJamPage() {
     transport: "local",
     id: "none",
   });
-  const [score, setScore] = useState<ArrayBuffer | string | null>(null);
-  const [scoreTracks, setScoreTracks] = useState<{ index: number; name: string }[]>([]);
-  const [scoreTrackIndex, setScoreTrackIndex] = useState(0);
   const [chart, setChart] = useState<JammerChart | null>(null);
   const [lyrics, setLyrics] = useState<Lyrics | null>(null);
   const [calibrating, setCalibrating] = useState(false);
@@ -53,6 +52,23 @@ export default function LocalJamPage() {
   // Rendered variants, keyed by semitone, so flipping back and forth is instant.
   const shiftCacheRef = useRef<Map<number, string>>(new Map());
   const originalUrlRef = useRef<string | null>(null);
+
+  // "Artist - Title.mp3" is the usual convention; a wrong guess costs nothing.
+  const song = useMemo(() => {
+    if (!file) return null;
+    const stem = file.name.replace(/\.[^.]+$/, "");
+    const [artist, title] = stem.split(/\s+-\s+/);
+    return title ? { title, artist } : { title: stem, artist: "" };
+  }, [file]);
+
+  const scoreFile = useScoreFile({
+    recording,
+    title: song?.title,
+    artist: song?.artist,
+    chart,
+    setChart,
+  });
+  const { score } = scoreFile;
 
   const [analyzerUp, setAnalyzerUp] = useState<boolean | null>(null);
   const [job, setJob] = useState<JobState | null>(null);
@@ -249,32 +265,13 @@ export default function LocalJamPage() {
               }
             />
           </label>
-          <label>
-            Score
-            <input
-              type="file"
-              accept=".gp,.gp3,.gp4,.gp5,.gpx,.musicxml,.xml"
-              onChange={async (e) => {
-                const f = e.target.files?.[0];
-                if (f) setScore(await f.arrayBuffer());
-              }}
-            />
-          </label>
-          {scoreTracks.length > 1 && (
-            <label>
-              Staff
-              <select
-                value={scoreTrackIndex}
-                onChange={(e) => setScoreTrackIndex(Number(e.target.value))}
-              >
-                {scoreTracks.map((t) => (
-                  <option key={t.index} value={t.index}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
+          <ScorePicker
+            scoreName={scoreFile.scoreName}
+            scoreTracks={scoreFile.scoreTracks}
+            scoreTrackIndex={scoreFile.scoreTrackIndex}
+            onTrackIndex={scoreFile.setScoreTrackIndex}
+            onFile={(f) => void scoreFile.openScoreFile(f)}
+          />
         </div>
 
         {file && analyzerUp && !job && (
@@ -293,6 +290,14 @@ export default function LocalJamPage() {
         </p>
       )}
       {analysisError && <p className="warn jam-error">{analysisError}</p>}
+      {scoreFile.scoreMessage && (
+        <p className="workspace-notice ok" role="status">
+          {scoreFile.scoreMessage}{" "}
+          <button className="linkish" onClick={scoreFile.dismissScoreMessage}>
+            OK
+          </button>
+        </p>
+      )}
 
       {ready && (
         <Transport
@@ -318,8 +323,8 @@ export default function LocalJamPage() {
           recording={recording}
           lyrics={lyrics}
           score={score}
-          scoreTrackIndex={scoreTrackIndex}
-          onScoreTracksLoaded={setScoreTracks}
+          scoreTrackIndex={scoreFile.scoreTrackIndex}
+          onScoreTracksLoaded={scoreFile.setScoreTracks}
           songTitle={chart?.title ?? file?.name}
           songArtist={chart?.artist}
           onChartImported={setChart}

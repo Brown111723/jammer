@@ -17,6 +17,7 @@
  */
 
 import type { JammerChart, RecordingRef, SyncPoint, SyncPointSet } from "./types";
+import { deleteScoreFile } from "./blob-store.ts";
 
 const CHART_KEY = "jammer.charts";
 const SYNC_KEY = "jammer.syncsets";
@@ -92,6 +93,9 @@ export async function deleteChart(id: string): Promise<void> {
     if (chartId === id) delete links[key];
   }
   write(LINK_KEY, links);
+
+  // And the notation file, if it came from one.
+  await deleteScoreFile(id);
 }
 
 // ---------------------------------------------------------------- sync sets

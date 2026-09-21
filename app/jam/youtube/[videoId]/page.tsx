@@ -15,8 +15,10 @@ import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { JamWorkspace } from "../../../../components/JamWorkspace";
 import { LatencyCalibrator } from "../../../../components/LatencyCalibrator";
+import { ScorePicker } from "../../../../components/ScorePicker";
 import { Transport } from "../../../../components/Transport";
 import { useYouTubePlayer } from "../../../../hooks/useYouTubePlayer";
+import { useScoreFile } from "../../../../hooks/useScoreFile";
 import { findChartForSong } from "../../../../lib/chart-store";
 import { fetchLyrics } from "../../../../lib/lyrics";
 import { SyncEngine } from "../../../../lib/sync-engine";
@@ -48,9 +50,8 @@ export default function YouTubeJamPage({
   const [meta, setMeta] = useState<{ title: string; channel: string } | null>(null);
   const [lyrics, setLyrics] = useState<Lyrics | null>(null);
   const [chart, setChart] = useState<JammerChart | null>(null);
-  const [score, setScore] = useState<ArrayBuffer | string | null>(null);
-  const [scoreTracks, setScoreTracks] = useState<{ index: number; name: string }[]>([]);
-  const [scoreTrackIndex, setScoreTrackIndex] = useState(0);
+  /** Artist and title as best they can be read from the video. */
+  const [song, setSong] = useState<{ title: string; artist: string } | null>(null);
   const [calibrating, setCalibrating] = useState(false);
   /** Whether the chart was aligned to this exact video, or matched from another one. */
   const [chartMatch, setChartMatch] = useState<"exact" | "matched" | null>(null);
@@ -60,6 +61,15 @@ export default function YouTubeJamPage({
     () => ({ transport: "youtube", id: videoId, title: meta?.title }),
     [videoId, meta],
   );
+
+  const scoreFile = useScoreFile({
+    recording,
+    title: song?.title,
+    artist: song?.artist,
+    chart,
+    setChart,
+  });
+  const { score } = scoreFile;
 
   useEffect(() => {
     const saved = Number(localStorage.getItem(LATENCY_KEY) ?? "0");
@@ -117,6 +127,7 @@ export default function YouTubeJamPage({
       if (!title || cancelled) return;
 
       const guessed = guessArtistTitle(title, channel ?? "");
+      if (!cancelled) setSong(guessed);
 
       // Lyrics — fully automatic, every time, for any song LRCLIB knows.
       try {
@@ -174,34 +185,13 @@ export default function YouTubeJamPage({
 
       <header className="jam-header">
         <Link href="/youtube">← Search</Link>
-        <div className="file-inputs">
-          <label>
-            Score
-            <input
-              type="file"
-              accept=".gp,.gp3,.gp4,.gp5,.gpx,.musicxml,.xml"
-              onChange={async (e) => {
-                const f = e.target.files?.[0];
-                if (f) setScore(await f.arrayBuffer());
-              }}
-            />
-          </label>
-          {scoreTracks.length > 1 && (
-            <label>
-              Staff
-              <select
-                value={scoreTrackIndex}
-                onChange={(e) => setScoreTrackIndex(Number(e.target.value))}
-              >
-                {scoreTracks.map((t) => (
-                  <option key={t.index} value={t.index}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-        </div>
+        <ScorePicker
+          scoreName={scoreFile.scoreName}
+          scoreTracks={scoreFile.scoreTracks}
+          scoreTrackIndex={scoreFile.scoreTrackIndex}
+          onTrackIndex={scoreFile.setScoreTrackIndex}
+          onFile={(f) => void scoreFile.openScoreFile(f)}
+        />
       </header>
 
       {status.kind === "error" && (
@@ -235,6 +225,22 @@ export default function YouTubeJamPage({
             onCalibrate={() => setCalibrating(true)}
           />
 
+          {scoreFile.scoreMessage && (
+            <p className="workspace-notice ok" role="status">
+              {scoreFile.scoreMessage}{" "}
+              <button className="linkish" onClick={scoreFile.dismissScoreMessage}>
+                OK
+              </button>
+            </p>
+          )}
+
+          {chart && chartMatch === "matched" && !chart.scoreFile && (
+            <p className="workspace-notice">
+              Using the chart you made for &ldquo;{chart.title}&rdquo; on another
+              recording. If it runs early or late, use Align.
+            </p>
+          )}
+
           {!chart && !score && (
             <p className="workspace-notice">
               No chart for this video yet. Load a Guitar Pro file, or transcribe your
@@ -250,8 +256,14 @@ export default function YouTubeJamPage({
             recording={recording}
             lyrics={lyrics}
             score={score}
-            scoreTrackIndex={scoreTrackIndex}
-            onScoreTracksLoaded={setScoreTracks}
+            scoreTrackIndex={scoreFile.scoreTrackIndex}
+            onScoreTracksLoaded={scoreFile.setScoreTracks}
+            songTitle={song?.title}
+            songArtist={song?.artist}
+            onChartImported={(c) => {
+              setChart(c);
+              setChartMatch("exact");
+            }}
           />
         </div>
       </div>

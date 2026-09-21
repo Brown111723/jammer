@@ -3,6 +3,20 @@
 The version (package.json) goes up once per delivered iteration. The build number
 shown in the app is the git commit count, so it rises with every commit.
 
+## 0.7.0
+- Fixed: Guitar Pro files failed with "could not render the score" (alphaTab's
+  render worker couldn't load under the bundler, and the file could arrive before
+  the renderer existed).
+- A Guitar Pro / MusicXML file now drives everything: highway notes for every part
+  (bass included), chord panel, tempo changes, sections, beat grid and loops.
+  Repeats and 1st/2nd endings are played out in order.
+- Tab files are remembered per song (stored in the browser) and load by themselves
+  next time the song is opened — on YouTube, Spotify or a local copy.
+- The notation cursor follows your Align adjustments, and the notation pane scrolls
+  with the song.
+- "A (no 3rd)" style chord names are shown as power chords (A5).
+- YouTube pages now get the chord-site links and chord-sheet paste too.
+
 ## 0.6.0
 - Version and build number shown in the home-page footer.
 - `scripts/update.sh` and a one-line updater for Termux (see README).

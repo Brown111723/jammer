@@ -14,3 +14,6 @@ analyzer/**/__pycache__/
 analyzer/cache/
 analyzer/uploads/
 *.pyc
+
+# Commercial tabs used as local test fixtures — not ours to publish.
+test/fixtures/*.gp*

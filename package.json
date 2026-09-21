@@ -1,6 +1,6 @@
 {
   "name": "jammer",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "Jam along with your favourite songs \u2014 tab, chords and lyrics synced to the actual recording you're streaming.",
   "scripts": {

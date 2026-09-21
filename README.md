@@ -22,7 +22,18 @@ version:
    runs offline on a file you supply. The streaming session only reports playhead position.
 
 3. **Tabs are licensed content.** We generate charts or import Guitar Pro files. We don't
-   scrape Ultimate Guitar.
+   scrape Ultimate Guitar, and don't log in to it on your behalf.
+
+### Using a Guitar Pro file (the best experience)
+
+1. On Ultimate Guitar (or Songsterr, or anywhere), download the "Guitar Pro" version of
+   the song once — `.gp`, `.gp5`, `.gpx` and MusicXML all work.
+2. On the song's jam page, press **Load tab file** and pick it.
+
+Jammer turns it into highway notes for every part, chords, tempo, sections and loop
+points, and saves it against the song. Next time you open that song — from YouTube
+Music, Spotify or a local file — it loads by itself. If the recording has a longer
+intro than the tab, use **Align** once; that is remembered too.
 
 Constraint 2 is the one that changes the product. Everything in this repo is built around it.
 
